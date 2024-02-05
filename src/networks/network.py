@@ -16,6 +16,7 @@ class LLL_Net(nn.Module):
         super(LLL_Net, self).__init__()
 
         self.model = model
+        self.primary_state_dict = deepcopy(model.state_dict())
         self.head_init_mode = head_init_mode
         last_layer = getattr(self.model, head_var)
 
@@ -87,6 +88,10 @@ class LLL_Net(nn.Module):
         """Freeze all parameters from the main model, but not the heads"""
         for param in self.model.parameters():
             param.requires_grad = False
+
+    def reset_backbone(self):
+        """Reset all parameters from the main model, but not the heads"""
+        self.model.load_state_dict(self.primary_state_dict)
 
     def freeze_bn(self):
         """Freeze all Batch Normalization layers from the model and use them in eval() mode"""

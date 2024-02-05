@@ -140,6 +140,8 @@ def main(argv=None):
     parser.add_argument('--extra-aug', default='', type=str,
                         choices=['', 'simclr', 'simclr_cifar', 'colorjitter', 'brightness', 'fetril'],
                         help='Additional data augmentations (default=%(default)s)')
+    parser.add_argument('--reset-backbone', action='store_true',
+                        help='Reset backbone weights between tasks ((default=%(default)s))')
 
     # gridsearch args
     parser.add_argument('--gridsearch-tasks', default=0, type=int,
@@ -311,6 +313,10 @@ def main(argv=None):
         # Add head for current task
         net.add_head(taskcla[t][1])
         net.to(device)
+
+        # Reset backbone weights
+        if t > 0 and args.reset_backbone:
+            net.reset_backbone()
 
         # GridSearch
         if t < args.gridsearch_tasks:
