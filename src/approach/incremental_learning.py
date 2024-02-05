@@ -94,7 +94,7 @@ class Inc_Learning_Appr:
                 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=10,
                                                                        min_lr=1e-4)
             elif self.warmup_scheduler.lower() == 'cosine':
-                scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=25, eta_min=0)
+                scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.warmup_epochs, eta_min=0)
             elif self.warmup_scheduler.lower() == 'onecycle':
                 scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=self.warmup_lr,
                                                                 total_steps=self.warmup_epochs,
@@ -122,6 +122,7 @@ class Inc_Learning_Appr:
 
                     outputs = self.model(images)
                     loss = self.warmup_loss(outputs[t], targets - self.model.task_offset[t])
+                    self.logger.log_scalar(task=None, iter=None, name="trn_batch_loss", value=loss, group=f"warmup_t{t}")
                     optimizer.zero_grad()
                     loss.backward()
                     torch.nn.utils.clip_grad_norm_(head_params, self.clipgrad)
@@ -150,25 +151,26 @@ class Inc_Learning_Appr:
                 self.logger.log_scalar(task=None, iter=e + 1, name="trn_loss", value=trn_loss, group=f"warmup_t{t}")
                 self.logger.log_scalar(task=None, iter=e + 1, name="trn_acc", value=100 * trn_acc, group=f"warmup_t{t}")
 
-                # Evaluate
-                warmupclock3 = time.time()
-                outputs = self._evaluate(t, debug=self.debug)
-                for name, value in outputs.items():
-                    self.logger.log_scalar(task=None, iter=e + 1, name=name, group=f"warmup_t{t}",
-                                           value=value)
-                if self.debug:
-                    self.logger.log_scalar(task=None, iter=e + 1, name='lr', group=f"warmup_t{t}",
-                                           value=optimizer.param_groups[0]["lr"])
-                    self._log_weight_norms(t, prev_heads_w_norm, prev_heads_b_norm,
-                                           self.model.heads[-1].weight.detach().norm().item(),
-                                           self.model.heads[-1].bias.detach().norm().item())
-
-                warmupclock4 = time.time()
-                print('| Epoch {:3d}, time={:5.1f}s | Eval: loss={:.3f}, TAg loss={:.3f}, TAw acc={:5.1f}% |'.format(
-                    e + 1, warmupclock4 - warmupclock3, outputs['ce_taw_current_task'],
-                    outputs['ce_tag_current_task'],
-                    100 * outputs['taw_acc_current_task']), end=''
-                )
+                # Evaluate -------------------------------------------------------------------------
+                # warmupclock3 = time.time()
+                # outputs = self._evaluate(t, debug=self.debug)
+                # for name, value in outputs.items():
+                #     self.logger.log_scalar(task=None, iter=e + 1, name=name, group=f"warmup_t{t}",
+                #                            value=value)
+                # if self.debug:
+                #     self.logger.log_scalar(task=None, iter=e + 1, name='lr', group=f"warmup_t{t}",
+                #                            value=optimizer.param_groups[0]["lr"])
+                #     self._log_weight_norms(t, prev_heads_w_norm, prev_heads_b_norm,
+                #                            self.model.heads[-1].weight.detach().norm().item(),
+                #                            self.model.heads[-1].bias.detach().norm().item())
+                #
+                # warmupclock4 = time.time()
+                # print('| Epoch {:3d}, time={:5.1f}s | Eval: loss={:.3f}, TAg loss={:.3f}, TAw acc={:5.1f}% |'.format(
+                #     e + 1, warmupclock4 - warmupclock3, outputs['ce_taw_current_task'],
+                #     outputs['ce_tag_current_task'],
+                #     100 * outputs['taw_acc_current_task']), end=''
+                # )
+                # -----------------------------------------------------------------------------------
 
                 if self.warmup_scheduler == 'plateau':
                     scheduler.step(outputs['tag_acc_current_task'])

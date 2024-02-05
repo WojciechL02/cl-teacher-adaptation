@@ -6,7 +6,7 @@ from copy import deepcopy
 class LLL_Net(nn.Module):
     """Basic class for implementing networks"""
 
-    def __init__(self, model, remove_existing_head=False):
+    def __init__(self, model, remove_existing_head=False, head_init_mode=None):
         head_var = model.head_var
         assert type(head_var) == str
         assert not remove_existing_head or hasattr(model, head_var), \
@@ -16,6 +16,7 @@ class LLL_Net(nn.Module):
         super(LLL_Net, self).__init__()
 
         self.model = model
+        self.head_init_mode = head_init_mode
         last_layer = getattr(self.model, head_var)
 
         if remove_existing_head:
@@ -42,6 +43,10 @@ class LLL_Net(nn.Module):
         corresponding offsets
         """
         self.heads.append(nn.Linear(self.out_size, num_outputs))
+        # weights initialization
+        if self.head_init_mode is not None:
+            self._initialize_head_weights()
+
         # we re-compute instead of append in case an approach makes changes to the heads
         self.task_cls = torch.tensor([head.out_features for head in self.heads])
         self.task_offset = torch.cat([torch.LongTensor(1).zero_(), self.task_cls.cumsum(0)[:-1]])
@@ -107,6 +112,19 @@ class LLL_Net(nn.Module):
     def unfreeze_last_head(self):
         for param in self.heads[-1].parameters():
             param.requires_grad = True
+
+    def _initialize_head_weights(self):
+        if self.head_init_mode == 'xavier':
+            nn.init.xavier_uniform_(self.heads[-1].weight)
+            nn.init.xavier_uniform_(self.heads[-1].bias)
+
+        elif self.head_init_mode == 'zeros':
+            nn.init.zeros_(self.heads[-1].weight)
+            nn.init.zeros_(self.heads[-1].bias)
+
+        elif self.head_init_mode == 'kaiming':
+            nn.init.kaiming_uniform_(self.heads[-1].weight)
+            nn.init.kaiming_uniform_(self.heads[-1].bias)
 
     def _initialize_weights(self):
         """Initialize weights using different strategies"""

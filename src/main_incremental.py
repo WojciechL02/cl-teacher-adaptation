@@ -93,6 +93,8 @@ def main(argv=None):
                         help='Network architecture used (default=%(default)s)', metavar="NETWORK")
     parser.add_argument('--keep-existing-head', action='store_true',
                         help='Disable removing classifier last layer (default=%(default)s)')
+    parser.add_argument('--head-init-mode', default=None, required=False, choices=['xavier', 'zeros', 'kaiming'],
+                        help='Mode of new head weights initialization (default=%(default)s)')
     parser.add_argument('--pretrained', action='store_true',
                         help='Use pretrained backbone (default=%(default)s)')
     # training args
@@ -265,7 +267,7 @@ def main(argv=None):
 
     # Network and Approach instances
     utils.seed_everything(seed=args.seed)
-    net = LLL_Net(init_model, remove_existing_head=not args.keep_existing_head)
+    net = LLL_Net(init_model, remove_existing_head=not args.keep_existing_head, head_init_mode=args.head_init_mode)
     utils.seed_everything(seed=args.seed)
     # taking transformations and class indices from first train dataset
     first_train_ds = trn_loader[0].dataset
