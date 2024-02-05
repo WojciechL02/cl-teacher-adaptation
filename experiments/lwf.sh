@@ -44,8 +44,7 @@ if [ ${wu_epochs} -gt 0 ]; then
     --wu-nepochs ${wu_epochs} \
     --wu-lr 0.1 \
     --wu-fix-bn \
-    --wu-scheduler onecycle \
-    --wu-patience 50
+    --wu-scheduler cosine
 else
   exp_name="${tag}:lamb_${lamb}:base"
   result_path="results/${tag}/lwf_base_${lamb}_${seed}"
