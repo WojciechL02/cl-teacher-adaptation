@@ -251,6 +251,21 @@ class Inc_Learning_Appr:
             }
         return output
 
+    def _continual_evaluation_step(self, t):
+        if t > 0:
+            loaders = self.tst_loader[:t + 1]
+
+            sum_acc = 0.
+
+            for task_id, loader in enumerate(loaders):
+                _, _, acc_tag = self.eval(t, loader)
+                self.logger.log_scalar(task=task_id, iter=None, name="acc_tag", value=100 * acc_tag, group="cont_eval")
+                if task_id < t:
+                    sum_acc += acc_tag
+
+            # Average accuracy over all previous tasks
+            self.logger.log_scalar(task=None, iter=None, name="avg_acc_tag", value=sum_acc / t, group="cont_eval")
+
     def _log_weight_norms(self, t, prev_w, prev_b, new_w, new_b):
         self.logger.log_scalar(task=None, iter=None, name='prev_heads_w_norm', group=f"wu_w_t{t}",
                                value=prev_w)
@@ -276,6 +291,7 @@ class Inc_Learning_Appr:
             # Train
             clock0 = time.time()
             self.train_epoch(t, trn_loader)
+            self._continual_evaluation_step(t)
             clock1 = time.time()
             if self.eval_on_train:
                 train_loss, train_acc, _ = self.eval(t, trn_loader)
