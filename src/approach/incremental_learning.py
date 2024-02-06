@@ -122,7 +122,7 @@ class Inc_Learning_Appr:
 
                     outputs = self.model(images)
                     loss = self.warmup_loss(outputs[t], targets - self.model.task_offset[t])
-                    self.logger.log_scalar(task=None, iter=None, name="trn_batch_loss", value=loss, group=f"warmup_t{t}")
+                    self.logger.log_scalar(task=None, iter=None, name="trn_batch_loss", value=loss.item(), group=f"warmup_t{t}")
                     optimizer.zero_grad()
                     loss.backward()
                     torch.nn.utils.clip_grad_norm_(head_params, self.clipgrad)
