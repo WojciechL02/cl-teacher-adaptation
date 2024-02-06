@@ -258,7 +258,7 @@ class Inc_Learning_Appr:
             sum_acc = 0.
 
             for task_id, loader in enumerate(loaders):
-                _, _, acc_tag = self.eval(t, loader)
+                _, _, acc_tag = self.eval(task_id, loader)
                 self.logger.log_scalar(task=task_id, iter=None, name="acc_tag", value=100 * acc_tag, group="cont_eval")
                 if task_id < t:
                     sum_acc += acc_tag
