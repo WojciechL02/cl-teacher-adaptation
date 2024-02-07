@@ -23,5 +23,6 @@ gamma=1e-3
 
 seed=0
 wu_epochs=20
+wu_lr=0.1
 
-./experiments/lwf_zh.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${lamb} ${wu_nepochs}
+./experiments/lwf_zh.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${lamb} ${wu_nepochs} ${wu_lr}
