@@ -104,9 +104,9 @@ def main(argv=None):
                         help='Number of epochs per training session (default=%(default)s)')
     parser.add_argument('--lr', default=0.1, type=float, required=False,
                         help='Starting learning rate (default=%(default)s)')
-    parser.add_argument('--scheduler-milestones', default=[60, 120, 160], nargs='+', type=int, required=False,
+    parser.add_argument('--scheduler-milestones', default=None, nargs='+', type=int, required=False,
                         help='Milestones for learning rate scheduler, overrides lr-patience scheme, '
-                             'if set to None scheduler will not be used (default=%(default)s)')
+                             'if set to None scheduler will not be used (default=%(default)s)')  # default=[60, 120, 160]
     parser.add_argument('--lr-min', default=1e-4, type=float, required=False,
                         help='Minimum learning rate (default=%(default)s)')
     parser.add_argument('--lr-factor', default=3, type=float, required=False,

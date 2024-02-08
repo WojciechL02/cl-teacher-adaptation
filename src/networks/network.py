@@ -16,7 +16,6 @@ class LLL_Net(nn.Module):
         super(LLL_Net, self).__init__()
 
         self.model = model
-        self.primary_state_dict = deepcopy(model.state_dict())
         self.head_init_mode = head_init_mode
         last_layer = getattr(self.model, head_var)
 
@@ -33,6 +32,8 @@ class LLL_Net(nn.Module):
                 setattr(self.model, head_var, nn.Sequential())
         else:
             self.out_size = last_layer.out_features
+
+        self.primary_state_dict = deepcopy(self.model.state_dict())
 
         self.heads = nn.ModuleList()
         self.task_cls = []
