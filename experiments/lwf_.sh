@@ -46,7 +46,7 @@ if [ ${wu_epochs} -gt 0 ]; then
     --wu-lr ${wu_lr} \
     --wu-fix-bn \
     --wu-scheduler cosine \
-    --reset-backbone
+    --scheduler-milestones 60 120 160
 else
   exp_name="${tag}:lamb_${lamb}:base"
   result_path="results/${tag}/lwf_base_${lamb}_${seed}"
