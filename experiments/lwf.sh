@@ -13,6 +13,7 @@ num_epochs=$8
 lamb=$9
 wu_epochs=${10:-0}
 wu_lr=${11:-0.1}
+lr=${12:-0.1}
 
 if [ "${dataset}" = "imagenet_subset_kaggle" ]; then
   clip=1.0
@@ -31,7 +32,7 @@ if [ ${wu_epochs} -gt 0 ]; then
     --nc-first-task ${nc_first_task} \
     --network ${network} \
     --use-test-as-val \
-    --lr 0.1 \
+    --lr ${lr} \
     --clipping ${clip} \
     --nepochs ${num_epochs} \
     --batch-size 128 \
@@ -57,7 +58,7 @@ else
     --nc-first-task ${nc_first_task} \
     --network ${network} \
     --use-test-as-val \
-    --lr 0.1 \
+    --lr ${lr} \
     --clipping ${clip} \
     --nepochs ${num_epochs} \
     --batch-size 128 \

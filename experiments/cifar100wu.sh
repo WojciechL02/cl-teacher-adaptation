@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH --time=48:00:00   # walltime
-#SBATCH --ntasks=4   # number of processor cores (i.e. tasks)
+#SBATCH --ntasks=3   # number of processor cores (i.e. tasks)
 #SBATCH --gpus=1
 
 set -e
@@ -22,9 +22,6 @@ beta=10
 gamma=1e-3
 
 seed=0
-wu_nepochs=20
+wu_nepochs=200
 
-for wu_lr in 0.28 0.3 0.33 0.36 ; do
-  ./experiments/lwf.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${lamb} ${wu_nepochs} ${wu_lr} &
-done
-wait
+./experiments/lwf.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${lamb} ${wu_nepochs}
