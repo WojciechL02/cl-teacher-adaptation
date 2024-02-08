@@ -354,7 +354,9 @@ def main(argv=None):
                 model_tag += "_pretrained"
             model_tag += "_ep" + str(args.nepochs) + "_bs" + str(args.batch_size) + "_lr" + str(args.lr) \
                          + "_wd" + str(args.weight_decay) + "_m" + str(args.momentum) + "_clip" \
-                         + str(args.clipping) + "_sched" + "_".join([str(m) for m in args.scheduler_milestones])
+                         + str(args.clipping)
+            if args.scheduler_milestones is not None:
+                model_tag += "_sched" + "_".join([str(m) for m in args.scheduler_milestones])
             model_ckpt_dir = os.path.join("checkpoints", exp_tag, model_tag)
             model_ckpt_path = os.path.join(model_ckpt_dir, "model_seed_" + str(args.seed) + ".ckpt")
             if os.path.exists(model_ckpt_path):
