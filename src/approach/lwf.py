@@ -290,7 +290,7 @@ class Appr(Inc_Learning_Appr):
             else:
                 loss_kd = self.cross_entropy(kd_outputs, kd_outputs_old, exp=1.0 / self.T)
         else:
-            loss_kd = 0
+            loss_kd = torch.zeros(1).to(self.device)
 
         # Current cross-entropy loss -- with exemplars use all heads
         if len(self.exemplars_dataset) > 0:
