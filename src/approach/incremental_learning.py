@@ -63,10 +63,10 @@ class Inc_Learning_Appr:
 
     def _get_scheduler(self):
         if self.scheduler_milestones is not None:
-            return torch.optim.lr_scheduler.MultiStepLR(optimizer=self.optimizer, milestones=self.scheduler_milestones,
-                                                        gamma=0.1)
+            return torch.optim.lr_scheduler.MultiStepLR(optimizer=self.optimizer, milestones=self.scheduler_milestones, gamma=0.1)
         else:
-            return None
+            return torch.optim.lr_scheduler.LinearLR(optimizer=self.optimizer, start_factor=1.0, end_factor=0.01, total_iters=self.nepochs)
+            # return None
 
     def train(self, t, trn_loader, val_loader):
         """Main train structure"""

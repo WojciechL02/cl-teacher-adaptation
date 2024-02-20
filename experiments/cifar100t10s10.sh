@@ -11,7 +11,6 @@ conda activate FACIL
 
 num_tasks=10
 nc_first_task=10
-num_epochs=200
 dataset=cifar100_icarl
 network=resnet32
 tag=cifar100t${num_tasks}s${nc_first_task}
@@ -24,8 +23,9 @@ gamma=1e-3
 seed=0
 wu_nepochs=0
 wu_lr=0
+lr=0.1
 
-for lr in 0.1 0.03 0.01; do
+for num_epochs in 200 100 50; do
   ./experiments/lwf.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${lamb} ${wu_nepochs} ${wu_lr} ${lr} &
 done
 wait
