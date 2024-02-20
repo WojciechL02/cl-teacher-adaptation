@@ -258,7 +258,7 @@ class Inc_Learning_Appr:
             sum_acc = 0.
 
             for task_id, loader in enumerate(loaders):
-                _, _, acc_tag = self.eval(task_id, loader)
+                _, _, acc_tag = self.eval(task_id, loader, log_partial_loss=False)
                 self.logger.log_scalar(task=task_id, iter=None, name="acc_tag", value=100 * acc_tag, group="cont_eval")
                 if task_id < t:
                     sum_acc += acc_tag
@@ -294,7 +294,7 @@ class Inc_Learning_Appr:
             self._continual_evaluation_step(t)
             clock1 = time.time()
             if self.eval_on_train:
-                train_loss, train_acc, _ = self.eval(t, trn_loader)
+                train_loss, train_acc, _ = self.eval(t, trn_loader, log_partial_loss=False)
                 clock2 = time.time()
                 print('| Epoch {:3d}, time={:5.1f}s/{:5.1f}s | Train: loss={:.3f}, TAw acc={:5.1f}% |'.format(
                     e + 1, clock1 - clock0, clock2 - clock1, train_loss, 100 * train_acc), end='')
@@ -305,7 +305,7 @@ class Inc_Learning_Appr:
 
             # Valid
             clock3 = time.time()
-            valid_loss, valid_acc, _ = self.eval(t, val_loader)
+            valid_loss, valid_acc, _ = self.eval(t, val_loader, log_partial_loss=True)
             clock4 = time.time()
             print(' Valid: time={:5.1f}s loss={:.3f}, TAw acc={:5.1f}% |'.format(
                 clock4 - clock3, valid_loss, 100 * valid_acc), end='')
@@ -370,7 +370,7 @@ class Inc_Learning_Appr:
         if self.scheduler is not None:
             self.scheduler.step()
 
-    def eval(self, t, val_loader):
+    def eval(self, t, val_loader, log_partial_loss=False):
         """Contains the evaluation code"""
         with torch.no_grad():
             total_loss, total_acc_taw, total_acc_tag, total_num = 0, 0, 0, 0

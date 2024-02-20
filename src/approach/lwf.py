@@ -212,10 +212,11 @@ class Appr(Inc_Learning_Appr):
         if self.scheduler is not None:
             self.scheduler.step()
 
-    def eval(self, t, val_loader):
+    def eval(self, t, val_loader, log_partial_loss=False):
         """Contains the evaluation code"""
         with torch.no_grad():
             total_loss, total_acc_taw, total_acc_tag, total_num = 0, 0, 0, 0
+            total_loss_kd, total_loss_ce = 0, 0
             self.model.eval()
             if self.model_old is not None:
                 self.model_old.eval()
@@ -228,10 +229,12 @@ class Appr(Inc_Learning_Appr):
                     targets_old = self.model_old(images)
                 # Forward current model
                 outputs = self.model(images)
-                loss = self.criterion(t, outputs, targets, targets_old)
+                loss, loss_kd, loss_ce = self.criterion(t, outputs, targets, targets_old, return_partial_losses=True)
                 hits_taw, hits_tag = self.calculate_metrics(outputs, targets)
                 # Log
                 total_loss += loss.data.cpu().numpy().item() * len(targets)
+                total_loss_kd += loss_kd.data.cpu().numpy().item() * len(targets)
+                total_loss_ce += loss_ce.data.cpu().numpy().item() * len(targets)
                 total_acc_taw += hits_taw.sum().data.cpu().numpy().item()
                 total_acc_tag += hits_tag.sum().data.cpu().numpy().item()
                 total_num += len(targets)
@@ -239,6 +242,12 @@ class Appr(Inc_Learning_Appr):
         if self.cka and t > 0 and self.training:
             _cka = cka(self.model, self.model_old, val_loader, self.device)
             self.logger.log_scalar(task=None, iter=None, name=f't_{t}', group=f"cka", value=_cka)
+
+        if log_partial_loss:
+            final_loss_kd = total_loss_kd / total_num
+            final_loss_ce = total_loss_ce / total_num
+            self.logger.log_scalar(task=None, iter=None, name="loss_kd", value=final_loss_kd, group="valid")
+            self.logger.log_scalar(task=None, iter=None, name="loss_ce", value=final_loss_ce, group="valid")
 
         return total_loss / total_num, total_acc_taw / total_num, total_acc_tag / total_num
 
