@@ -25,7 +25,7 @@ wu_nepochs=0
 wu_lr=0
 lr=0.1
 
-for num_epochs in 200 100 50; do
+for num_epochs in 200 150 100; do
   ./experiments/lwf.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${lamb} ${wu_nepochs} ${wu_lr} ${lr} &
 done
 wait

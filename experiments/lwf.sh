@@ -37,7 +37,6 @@ if [ ${wu_epochs} -gt 0 ]; then
     --nepochs ${num_epochs} \
     --batch-size 128 \
     --seed ${seed} \
-    --cache-first-task-model \
     --log disk wandb \
     --results-path ${result_path} \
     --tags ${tag} \
@@ -63,7 +62,6 @@ else
     --nepochs ${num_epochs} \
     --batch-size 128 \
     --seed ${seed} \
-    --cache-first-task-model \
     --log disk wandb \
     --results-path ${result_path} \
     --tags ${tag} \
