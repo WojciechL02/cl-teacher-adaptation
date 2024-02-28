@@ -122,7 +122,7 @@ class LLL_Net(nn.Module):
     def _initialize_head_weights(self):
         if self.head_init_mode == 'xavier':
             nn.init.xavier_uniform_(self.heads[-1].weight)
-            nn.init.xavier_uniform_(self.heads[-1].bias)
+            nn.init.zeros_(self.heads[-1].bias)
 
         elif self.head_init_mode == 'zeros':
             nn.init.zeros_(self.heads[-1].weight)
@@ -130,7 +130,7 @@ class LLL_Net(nn.Module):
 
         elif self.head_init_mode == 'kaiming':
             nn.init.kaiming_uniform_(self.heads[-1].weight)
-            nn.init.kaiming_uniform_(self.heads[-1].bias)
+            nn.init.zeros_(self.heads[-1].bias)
 
     def _initialize_weights(self):
         """Initialize weights using different strategies"""

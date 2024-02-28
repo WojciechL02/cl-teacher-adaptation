@@ -26,7 +26,7 @@ lr=0.1
 wu_nepochs=20
 wu_lr=0.8
 
-for head_init in xavier zeros kaiming; do
+for head_init in xavier kaiming; do
   ./experiments/lwf2.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${lamb} ${wu_nepochs} ${wu_lr} ${lr} ${head_init} &
 done
 wait
