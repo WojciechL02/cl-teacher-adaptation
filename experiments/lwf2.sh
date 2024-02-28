@@ -47,7 +47,7 @@ if [ ${wu_epochs} -gt 0 ]; then
     --wu-lr ${wu_lr} \
     --wu-fix-bn \
     --wu-scheduler cosine \
-    --head-init-mode head_init
+    --head-init-mode ${head_init}
 else
   exp_name="${tag}:lamb_${lamb}:base"
   result_path="results/${tag}/lwf_base_${lamb}_${seed}"
