@@ -15,11 +15,12 @@ wu_lr=${10:-0.1}
 lr=${11:-0.1}
 head_init=${12}
 
-if [ "${dataset}" = "imagenet_subset_kaggle" ]; then
-  clip=1.0
-else
-  clip=100.0
-fi
+#if [ "${dataset}" = "imagenet_subset_kaggle" ]; then
+#  clip=1.0
+#else
+#  clip=100.0
+#fi
+clip=0.0
 
 if [ ${wu_epochs} -gt 0 ]; then
   exp_name="${tag}:ft:wu"
