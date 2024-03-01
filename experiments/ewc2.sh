@@ -13,7 +13,7 @@ num_epochs=$8
 wu_epochs=${9:-0}
 wu_lr=${10:-0.1}
 lr=${11:-0.1}
-head_init=${12}
+lamb=${12}
 
 #if [ "${dataset}" = "imagenet_subset_kaggle" ]; then
 #  clip=1.0
@@ -41,7 +41,9 @@ if [ ${wu_epochs} -gt 0 ]; then
     --log disk wandb \
     --results-path ${result_path} \
     --tags ${tag} \
+    --scheduler-milestones \
     --approach ewc \
+    --lamb ${lamb} \
     --wu-nepochs ${wu_epochs} \
     --wu-lr ${wu_lr} \
     --wu-fix-bn \
@@ -66,6 +68,7 @@ else
     --log disk wandb \
     --results-path ${result_path} \
     --tags ${tag} \
+    --scheduler-milestones \
     --approach ewc \
-    --head-init-mode ${head_init}
+    --lamb ${lamb}
 fi

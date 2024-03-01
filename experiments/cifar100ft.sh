@@ -20,7 +20,7 @@ num_epochs=100
 wu_nepochs=0
 wu_lr=0.8
 
-for lr in 0.01 0.001 0.0001; do
+for lr in 0.01 0.005, 0.001; do
   ./experiments/ft1.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${wu_nepochs} ${wu_lr} ${lr} &
 done
 wait

@@ -42,6 +42,8 @@ if [ ${wu_epochs} -gt 0 ]; then
     --results-path ${result_path} \
     --tags ${tag} \
     --approach finetuning \
+    --scheduler-milestones \
+    --num-exemplars 2000 \
     --wu-nepochs ${wu_epochs} \
     --wu-lr ${wu_lr} \
     --wu-fix-bn \
@@ -66,6 +68,8 @@ else
     --log disk wandb \
     --results-path ${result_path} \
     --tags ${tag} \
+    --scheduler-milestones \
     --approach finetuning \
+    --num-exemplars 2000 \
     --head-init-mode ${head_init}
 fi

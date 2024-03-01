@@ -40,6 +40,7 @@ if [ ${wu_epochs} -gt 0 ]; then
     --log disk wandb \
     --results-path ${result_path} \
     --tags ${tag} \
+    --scheduler-milestones \
     --approach ewc \
     --wu-nepochs ${wu_epochs} \
     --wu-lr ${wu_lr} \
@@ -64,5 +65,6 @@ else
     --log disk wandb \
     --results-path ${result_path} \
     --tags ${tag} \
+    --scheduler-milestones \
     --approach ewc
 fi
