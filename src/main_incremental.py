@@ -104,9 +104,9 @@ def main(argv=None):
                         help='Number of epochs per training session (default=%(default)s)')
     parser.add_argument('--lr', default=0.1, type=float, required=False,
                         help='Starting learning rate (default=%(default)s)')
-    parser.add_argument('--scheduler-milestones', default=None, nargs='+', type=int, required=False,
-                        help='Milestones for learning rate scheduler, overrides lr-patience scheme, '
-                             'if set to None scheduler will not be used (default=%(default)s)')  # default=[60, 120, 160]
+    parser.add_argument('--scheduler-milestones', default=False, action='store_true', required=False,
+                        help='If True, then LinearLR scheduler will be used, '
+                             'if set to False scheduler will not be used (default=%(default)s)')  # default=[60, 120, 160]
     parser.add_argument('--lr-min', default=1e-4, type=float, required=False,
                         help='Minimum learning rate (default=%(default)s)')
     parser.add_argument('--lr-factor', default=3, type=float, required=False,
@@ -355,8 +355,8 @@ def main(argv=None):
             model_tag += "_ep" + str(args.nepochs) + "_bs" + str(args.batch_size) + "_lr" + str(args.lr) \
                          + "_wd" + str(args.weight_decay) + "_m" + str(args.momentum) + "_clip" \
                          + str(args.clipping)
-            if args.scheduler_milestones is not None:
-                model_tag += "_sched" + "_".join([str(m) for m in args.scheduler_milestones])
+            # if args.scheduler_milestones is not None:
+            #     model_tag += "_sched" + "_".join([str(m) for m in args.scheduler_milestones])
             model_ckpt_dir = os.path.join("checkpoints", exp_tag, model_tag)
             model_ckpt_path = os.path.join(model_ckpt_dir, "model_seed_" + str(args.seed) + ".ckpt")
             if os.path.exists(model_ckpt_path):
