@@ -21,8 +21,8 @@ else
 fi
 
 if [ ${wu_epochs} -gt 0 ]; then
-  exp_name="${tag}:wu"
-  result_path="results/${tag}/ewc_wu_${seed}"
+  exp_name="${tag}:ft:wu"
+  result_path="results/${tag}/ft_wu_${seed}"
   python3 src/main_incremental.py \
     --exp-name ${exp_name} \
     --gpu ${gpu} \
@@ -45,8 +45,8 @@ if [ ${wu_epochs} -gt 0 ]; then
     --wu-fix-bn \
     --wu-scheduler cosine
 else
-  exp_name="${tag}:lamb_${lamb}"
-  result_path="results/${tag}/ewc_${seed}"
+  exp_name="${tag}:ft"
+  result_path="results/${tag}/ft_${seed}"
   python3 src/main_incremental.py \
     --exp-name ${exp_name} \
     --gpu ${gpu} \

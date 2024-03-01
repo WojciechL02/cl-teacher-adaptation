@@ -22,7 +22,7 @@ else
 fi
 
 if [ ${wu_epochs} -gt 0 ]; then
-  exp_name="${tag}:wu"
+  exp_name="${tag}:ewc:wu"
   result_path="results/${tag}/ewc_wu_${seed}"
   python3 src/main_incremental.py \
     --exp-name ${exp_name} \
@@ -47,7 +47,7 @@ if [ ${wu_epochs} -gt 0 ]; then
     --wu-scheduler cosine \
     --head-init-mode ${head_init}
 else
-  exp_name="${tag}:lamb_${lamb}"
+  exp_name="${tag}:ewc"
   result_path="results/${tag}/ewc_${seed}"
   python3 src/main_incremental.py \
     --exp-name ${exp_name} \
