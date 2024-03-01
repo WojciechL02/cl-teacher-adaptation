@@ -14,7 +14,7 @@ class Inc_Learning_Appr:
                  momentum=0, wd=0, multi_softmax=False, wu_nepochs=0, wu_lr=1e-1, wu_fix_bn=False,
                  wu_scheduler='constant', wu_patience=None, wu_wd=0., fix_bn=False,
                  eval_on_train=False, select_best_model_by_val_loss=True, logger: ExperimentLogger = None,
-                 exemplars_dataset: ExemplarsDataset = None, scheduler_milestones=None, no_learning=False):
+                 exemplars_dataset: ExemplarsDataset = None, scheduler_milestones=False, no_learning=False):
         self.model = model
         self.device = device
         self.nepochs = nepochs
@@ -62,11 +62,11 @@ class Inc_Learning_Appr:
         return torch.optim.SGD(self.model.parameters(), lr=self.lr, weight_decay=self.wd, momentum=self.momentum)
 
     def _get_scheduler(self):
-        if self.scheduler_milestones is not None:
-            return torch.optim.lr_scheduler.MultiStepLR(optimizer=self.optimizer, milestones=self.scheduler_milestones, gamma=0.1)
-        else:
+        if self.scheduler_milestones:
+            # return torch.optim.lr_scheduler.MultiStepLR(optimizer=self.optimizer, milestones=self.scheduler_milestones, gamma=0.1)
             return torch.optim.lr_scheduler.LinearLR(optimizer=self.optimizer, start_factor=1.0, end_factor=0.01, total_iters=self.nepochs)
-            # return None
+        else:
+            return None
 
     def train(self, t, trn_loader, val_loader):
         """Main train structure"""
