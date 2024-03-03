@@ -113,7 +113,7 @@ def main(argv=None):
                         help='Learning rate decreasing factor (default=%(default)s)')
     parser.add_argument('--lr-patience', default=5, type=int, required=False,
                         help='Maximum patience to wait before decreasing learning rate (default=%(default)s)')
-    parser.add_argument('--clipping', default=100., type=float, required=False,
+    parser.add_argument('--clipping', default=10000., type=float, required=False,
                         help='Clip gradient norm (default=%(default)s)')
     parser.add_argument('--momentum', default=0.0, type=float, required=False,
                         help='Momentum factor (default=%(default)s)')
