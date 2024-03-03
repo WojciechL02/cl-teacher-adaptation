@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --time=48:00:00   # walltime
+#SBATCH --time=12:00:00   # walltime
 #SBATCH --ntasks=3   # number of processor cores (i.e. tasks)
 #SBATCH --gpus=1
 
@@ -20,7 +20,7 @@ num_epochs=100
 wu_nepochs=0
 wu_lr=0.8
 
-for lr in 0.01 0.005, 0.001; do
+for lr in 0.1 0.05, 0.01; do
   ./experiments/ft1.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${wu_nepochs} ${wu_lr} ${lr} &
 done
 wait

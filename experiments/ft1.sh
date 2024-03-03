@@ -14,13 +14,6 @@ wu_epochs=${9:-0}
 wu_lr=${10:-0.1}
 lr=${11:-0.1}
 
-#if [ "${dataset}" = "imagenet_subset_kaggle" ]; then
-#  clip=1.0
-#else
-#  clip=100.0
-#fi
-clip=0.0
-
 if [ ${wu_epochs} -gt 0 ]; then
   exp_name="${tag}:ft:wu"
   result_path="results/${tag}/ft_wu_${seed}"
@@ -33,7 +26,6 @@ if [ ${wu_epochs} -gt 0 ]; then
     --network ${network} \
     --use-test-as-val \
     --lr ${lr} \
-    --clipping ${clip} \
     --nepochs ${num_epochs} \
     --batch-size 128 \
     --seed ${seed} \
@@ -59,7 +51,6 @@ else
     --network ${network} \
     --use-test-as-val \
     --lr ${lr} \
-    --clipping ${clip} \
     --nepochs ${num_epochs} \
     --batch-size 128 \
     --seed ${seed} \
