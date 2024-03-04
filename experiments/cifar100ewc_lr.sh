@@ -17,17 +17,17 @@ tag=cifar100t${num_tasks}s${nc_first_task}
 
 seed=0
 num_epochs=100
-wu_nepochs=0
+lr=0.1
 wu_lr=0.8
 
-for lr in 0.1 0.05 0.01 ; do
-  ./experiments/ewc1.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${wu_nepochs} ${wu_lr} ${lr} &
-done
-wait
-
-#head_init=zeros
-#
-#for wu_nepochs in 0 20; do
-#  ./experiments/ewc2.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${wu_nepochs} ${wu_lr} ${lr} ${head_init} &
+#for lr in 0.1 0.05 0.01 ; do
+#  ./experiments/ewc1.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${wu_nepochs} ${wu_lr} ${lr} &
 #done
 #wait
+
+wu_nepochs=20
+head_init=zeros
+./experiments/ewc1.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${wu_nepochs} ${wu_lr} ${lr} &
+./experiments/ewc2.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${wu_nepochs} ${wu_lr} ${lr} ${head_init} &
+wu_nepochs=0
+./experiments/ewc2.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${wu_nepochs} ${wu_lr} ${lr} ${head_init} &
