@@ -13,7 +13,8 @@ num_epochs=$8
 wu_epochs=${9:-0}
 wu_lr=${10:-0.1}
 lr=${11:-0.1}
-head_init=${12}
+lamb=${12}
+head_init=${13}
 
 if [ ${wu_epochs} -gt 0 ]; then
   exp_name="${tag}:ewc:wu"
@@ -35,6 +36,7 @@ if [ ${wu_epochs} -gt 0 ]; then
     --tags ${tag} \
     --scheduler-milestones \
     --approach ewc \
+    --lamb ${lamb} \
     --wu-nepochs ${wu_epochs} \
     --wu-lr ${wu_lr} \
     --wu-fix-bn \
@@ -60,5 +62,6 @@ else
     --tags ${tag} \
     --scheduler-milestones \
     --approach ewc \
+    --lamb ${lamb} \
     --head-init-mode ${head_init}
 fi

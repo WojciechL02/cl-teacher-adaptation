@@ -19,6 +19,7 @@ seed=0
 num_epochs=100
 lr=0.1
 wu_lr=0.8
+lamb=10000
 
 #for lr in 0.1 0.05 0.01 ; do
 #  ./experiments/ewc1.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${wu_nepochs} ${wu_lr} ${lr} &
@@ -27,7 +28,7 @@ wu_lr=0.8
 
 wu_nepochs=20
 head_init=zeros
-./experiments/ewc1.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${wu_nepochs} ${wu_lr} ${lr} &
-./experiments/ewc2.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${wu_nepochs} ${wu_lr} ${lr} ${head_init} &
-wu_nepochs=0
-./experiments/ewc2.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${wu_nepochs} ${wu_lr} ${lr} ${head_init} &
+./experiments/ewc1.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${wu_nepochs} ${wu_lr} ${lr} ${lamb} &
+./experiments/ewc2.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${wu_nepochs} ${wu_lr} ${lr} ${lamb} ${head_init} &
+./experiments/ewc2.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${0} ${wu_lr} ${lr} ${lamb} ${head_init} &
+wait
