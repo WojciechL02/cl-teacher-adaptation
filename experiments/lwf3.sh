@@ -69,5 +69,6 @@ else
     --tags ${tag} \
     --scheduler-milestones \
     --approach lwf \
-    --lamb ${lamb}
+    --lamb ${lamb} \
+    --reset-backbone
 fi

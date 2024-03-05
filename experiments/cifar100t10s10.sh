@@ -15,7 +15,7 @@ dataset=cifar100_icarl
 network=resnet32
 tag=cifar100t${num_tasks}s${nc_first_task}
 
-lamb=10
+lamb=5  # 10
 lamb_mc=0.5
 beta=10
 gamma=1e-3
@@ -26,7 +26,6 @@ lr=0.1
 wu_nepochs=0
 wu_lr=0.8
 
-#for head_init in xavier kaiming; do
-./experiments/lwf1.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${lamb} ${wu_nepochs} ${wu_lr} ${lr}
-#done
-#wait
+./experiments/lwf1.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${lamb} ${wu_nepochs} ${wu_lr} ${lr} &
+./experiments/lwf3.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${lamb} ${wu_nepochs} ${wu_lr} ${lr} &
+wait
