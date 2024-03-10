@@ -70,5 +70,6 @@ else
     --tags ${tag} \
     --scheduler-milestones \
     --approach lwf \
-    --lamb ${lamb}
+    --lamb ${lamb} \
+    --head-init-mode ${head_init}
 fi
