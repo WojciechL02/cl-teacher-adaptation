@@ -256,10 +256,9 @@ class Inc_Learning_Appr:
     def _continual_evaluation_step(self, t):
         prev_t_acc = torch.zeros((t,), requires_grad=False)
         current_t_acc = 0.
+        sum_acc = 0.
         with torch.no_grad():
             loaders = self.tst_loader[:t + 1]
-
-            sum_acc = 0.
 
             self.model.eval()
             for task_id, loader in enumerate(loaders):
@@ -285,7 +284,8 @@ class Inc_Learning_Appr:
             if t > 0:
                 # Average accuracy over all previous tasks
                 self.logger.log_scalar(task=None, iter=None, name="avg_acc_tag", value=100 * sum_acc / t, group="cont_eval")
-        return prev_t_acc, current_t_acc
+        avg_prev_acc = sum_acc / t if t > 0 else 0.
+        return prev_t_acc, current_t_acc, avg_prev_acc
 
     def _log_weight_norms(self, t, prev_w, prev_b, new_w, new_b):
         self.logger.log_scalar(task=None, iter=None, name='prev_heads_w_norm', group=f"wu_w_t{t}",
@@ -318,13 +318,10 @@ class Inc_Learning_Appr:
 
             # CONTINUAL EVALUATION
             ####################################################################
-            if t == 0 and e == self.nepochs - 1:
-                _, current_acc = self._continual_evaluation_step(t)
-                self.prev_t_acc = current_acc
-            elif t > 0:
-                prev_t_accs, current_acc = self._continual_evaluation_step(t)
+            if t > 0:
+                prev_t_accs, current_acc, avg_prev_acc = self._continual_evaluation_step(t)
                 min_acc_all = torch.minimum(min_acc_all, prev_t_accs)
-                max_drop = current_acc if current_acc < max_drop else max_drop
+                max_drop = avg_prev_acc if avg_prev_acc < max_drop else max_drop
 
                 # min-ACC
                 min_acc = min_acc_all.mean().item()
@@ -335,22 +332,24 @@ class Inc_Learning_Appr:
                 wc_acc = (1 / k) * current_acc + (1 - (1 / k)) * min_acc
                 self.logger.log_scalar(task=None, iter=None, name="wc_acc", value=100 * wc_acc, group="cont_eval")
 
-                if e == self.nepochs - 1:
+                if t == 1 and e == self.nepochs - 1:
+                    self.prev_t_acc = avg_prev_acc
+                elif t > 1 and e == self.nepochs - 1:
                     # Stability-gap
-                    sg = 100 * (self.prev_t_acc - max_drop)
-                    self.logger.log_scalar(task=None, iter=None, name="stability_gap_abs", value=abs(sg), group="cont_eval")
-                    self.logger.log_scalar(task=None, iter=None, name="stability_gap_abs_norm", value=abs(sg / self.prev_t_acc), group="cont_eval")
-                    self.logger.log_scalar(task=None, iter=None, name="stability_gap_rel", value=sg, group="cont_eval")
-                    self.logger.log_scalar(task=None, iter=None, name="stability_gap_rel_norm", value=(sg / self.prev_t_acc), group="cont_eval")
+                    sg = self.prev_t_acc - max_drop
+                    self.logger.log_scalar(task=None, iter=None, name="stability_gap_abs", value=100*abs(sg), group="cont_eval")
+                    self.logger.log_scalar(task=None, iter=None, name="stability_gap_abs_norm", value=100*abs(sg / self.prev_t_acc), group="cont_eval")
+                    self.logger.log_scalar(task=None, iter=None, name="stability_gap_rel", value=100*sg, group="cont_eval")
+                    self.logger.log_scalar(task=None, iter=None, name="stability_gap_rel_norm", value=100*(sg / self.prev_t_acc), group="cont_eval")
 
                     # Recovery
-                    rc = 100 * (max_drop - current_acc)  # in last epoch 'current_acc' is the last measured acc in task t
-                    self.logger.log_scalar(task=None, iter=None, name="recovery_abs", value=abs(rc), group="cont_eval")
-                    self.logger.log_scalar(task=None, iter=None, name="recovery_abs_norm", value=abs(rc / self.prev_t_acc), group="cont_eval")
-                    self.logger.log_scalar(task=None, iter=None, name="recovery_rel", value=rc, group="cont_eval")
-                    self.logger.log_scalar(task=None, iter=None, name="recovery_rel_norm", value=(rc / self.prev_t_acc), group="cont_eval")
+                    rc = avg_prev_acc - max_drop  # in last epoch 'avg_prev_acc' is the last measured acc in task t
+                    self.logger.log_scalar(task=None, iter=None, name="recovery_abs", value=100*abs(rc), group="cont_eval")
+                    self.logger.log_scalar(task=None, iter=None, name="recovery_abs_norm", value=100*abs(rc / self.prev_t_acc), group="cont_eval")
+                    self.logger.log_scalar(task=None, iter=None, name="recovery_rel", value=100*rc, group="cont_eval")
+                    self.logger.log_scalar(task=None, iter=None, name="recovery_rel_norm", value=100*(rc / self.prev_t_acc), group="cont_eval")
 
-                    self.prev_t_acc = current_acc
+                    self.prev_t_acc = avg_prev_acc
             ####################################################################
 
             clock1 = time.time()
