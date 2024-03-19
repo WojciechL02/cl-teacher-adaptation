@@ -44,7 +44,7 @@ class Inc_Learning_Appr:
         self.debug = False
         self.no_learning = no_learning
 
-        self.prev_t_acc = 0.  # variable for stability/recovery metrics
+        self.last_e_accs = None # variable for stability-gap metric
 
     @staticmethod
     def extra_parser(args):
@@ -286,6 +286,7 @@ class Inc_Learning_Appr:
                 self.logger.log_scalar(task=None, iter=None, name="avg_acc_tag", value=100 * sum_acc / t, group="cont_eval")
         avg_prev_acc = sum_acc / t if t > 0 else 0.
         return prev_t_acc, current_t_acc, avg_prev_acc
+        # acc poprzednich tasków, acc na aktualnym tasku, średnia z poprzednich tasków
 
     def _log_weight_norms(self, t, prev_w, prev_b, new_w, new_b):
         self.logger.log_scalar(task=None, iter=None, name='prev_heads_w_norm', group=f"wu_w_t{t}",
@@ -307,8 +308,7 @@ class Inc_Learning_Appr:
         self.optimizer = self._get_optimizer()
         self.scheduler = self._get_scheduler()
 
-        min_acc_all = torch.ones((t,), requires_grad=False)
-        max_drop = 1.
+        min_accs_prev = torch.ones((t,), requires_grad=False)
 
         # Loop epochs
         for e in range(self.nepochs):
@@ -318,13 +318,16 @@ class Inc_Learning_Appr:
 
             # CONTINUAL EVALUATION
             ####################################################################
-            if t > 0:
-                prev_t_accs, current_acc, avg_prev_acc = self._continual_evaluation_step(t)
-                min_acc_all = torch.minimum(min_acc_all, prev_t_accs)
-                max_drop = avg_prev_acc if avg_prev_acc < max_drop else max_drop
+            prev_t_accs, current_acc, avg_prev_acc = self._continual_evaluation_step(t)
 
+            # save accs on last epoch of task 0
+            if t == 0 and e == self.nepochs - 1:
+                self.last_e_accs = torch.tensor([current_acc])
+
+            if t > 0:
                 # min-ACC
-                min_acc = min_acc_all.mean().item()
+                min_accs_prev = torch.minimum(min_accs_prev, prev_t_accs)
+                min_acc = min_accs_prev.mean().item()
                 self.logger.log_scalar(task=None, iter=None, name="min_acc", value=100 * min_acc, group="cont_eval")
 
                 # WC-ACC
@@ -332,24 +335,26 @@ class Inc_Learning_Appr:
                 wc_acc = (1 / k) * current_acc + (1 - (1 / k)) * min_acc
                 self.logger.log_scalar(task=None, iter=None, name="wc_acc", value=100 * wc_acc, group="cont_eval")
 
-                if t == 1 and e == self.nepochs - 1:
-                    self.prev_t_acc = avg_prev_acc
-                elif t > 1 and e == self.nepochs - 1:
-                    # Stability-gap
-                    sg = self.prev_t_acc - max_drop
-                    self.logger.log_scalar(task=None, iter=None, name="stability_gap_abs", value=100*abs(sg), group="cont_eval")
-                    self.logger.log_scalar(task=None, iter=None, name="stability_gap_abs_norm", value=100*abs(sg / self.prev_t_acc), group="cont_eval")
-                    self.logger.log_scalar(task=None, iter=None, name="stability_gap_rel", value=100*sg, group="cont_eval")
-                    self.logger.log_scalar(task=None, iter=None, name="stability_gap_rel_norm", value=100*(sg / self.prev_t_acc), group="cont_eval")
-
+                # in last epoch of tasks > 0
+                if e == self.nepochs - 1:
+                    # Stability Gap
+                    sg = self.last_e_accs - min_accs_prev
+                    sg_normalized = torch.div(sg, self.last_e_accs)
                     # Recovery
-                    rc = avg_prev_acc - max_drop  # in last epoch 'avg_prev_acc' is the last measured acc in task t
-                    self.logger.log_scalar(task=None, iter=None, name="recovery_abs", value=100*abs(rc), group="cont_eval")
-                    self.logger.log_scalar(task=None, iter=None, name="recovery_abs_norm", value=100*abs(rc / self.prev_t_acc), group="cont_eval")
-                    self.logger.log_scalar(task=None, iter=None, name="recovery_rel", value=100*rc, group="cont_eval")
-                    self.logger.log_scalar(task=None, iter=None, name="recovery_rel_norm", value=100*(rc / self.prev_t_acc), group="cont_eval")
+                    rec = prev_t_accs - min_accs_prev  # in last epoch prev_t_accs is final_acc of prev tasks
+                    rec_normalized = torch.div(rec, self.last_e_accs)
+                    # Log SG and REC
+                    for ts in range(sg.shape[0]):
+                        self.logger.log_scalar(task=ts, iter=None, name="stability_gap", value=100 * sg[ts], group="cont_eval")
+                        self.logger.log_scalar(task=ts, iter=None, name="stability_gap_normal", value=100 * sg_normalized[ts], group="cont_eval")
+                        self.logger.log_scalar(task=None, iter=None, name="stability_gap_avg", value=100 * sg.mean().item(), group="cont_eval")
 
-                    self.prev_t_acc = avg_prev_acc
+                        self.logger.log_scalar(task=ts, iter=None, name="recovery", value=100 * rec[ts], group="cont_eval")
+                        self.logger.log_scalar(task=ts, iter=None, name="recovery_normal", value=100 * rec_normalized[ts], group="cont_eval")
+                        self.logger.log_scalar(task=None, iter=None, name="recovery_avg", value=100 * rec.mean().item(), group="cont_eval")
+
+                    # New last acc of prev tasks (current task becomes a prev task)
+                    self.last_e_accs = torch.cat((prev_t_accs, torch.tensor([current_acc])))
             ####################################################################
 
             clock1 = time.time()
