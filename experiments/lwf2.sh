@@ -23,8 +23,8 @@ else
 fi
 
 if [ ${wu_epochs} -gt 0 ]; then
-  exp_name="${tag}:lamb_${lamb}:base:wu"
-  result_path="results/${tag}/lwf_base_wu_${lamb}_${seed}"
+  exp_name="cifar100t${num_tasks}s${nc_first_task}_${tag}_wu_hz"
+  result_path="results/${tag}/lwf_wu_hz_${lamb}_${seed}"
   python3 src/main_incremental.py \
     --exp-name ${exp_name} \
     --gpu ${gpu} \
@@ -50,8 +50,8 @@ if [ ${wu_epochs} -gt 0 ]; then
     --wu-scheduler cosine \
     --head-init-mode ${head_init}
 else
-  exp_name="${tag}:lamb_${lamb}:base"
-  result_path="results/${tag}/lwf_base_${lamb}_${seed}"
+  exp_name="cifar100t${num_tasks}s${nc_first_task}_${tag}_hz"
+  result_path="results/${tag}/lwf_hz_${lamb}_${seed}"
   python3 src/main_incremental.py \
     --exp-name ${exp_name} \
     --gpu ${gpu} \

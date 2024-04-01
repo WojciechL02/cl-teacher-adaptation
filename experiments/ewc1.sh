@@ -16,7 +16,7 @@ lr=${11:-0.1}
 lamb=${12}
 
 if [ ${wu_epochs} -gt 0 ]; then
-  exp_name="${tag}:ewc:wu"
+  exp_name="cifar100t${num_tasks}s${nc_first_task}_${tag}_wu"
   result_path="results/${tag}/ewc_wu_${seed}"
   python3 src/main_incremental.py \
     --exp-name ${exp_name} \
@@ -41,8 +41,8 @@ if [ ${wu_epochs} -gt 0 ]; then
     --wu-fix-bn \
     --wu-scheduler cosine
 else
-  exp_name="${tag}:ewc"
-  result_path="results/${tag}/ewc_${seed}"
+  exp_name="cifar100t${num_tasks}s${nc_first_task}_${tag}_base"
+  result_path="results/${tag}/ewc_base_${seed}"
   python3 src/main_incremental.py \
     --exp-name ${exp_name} \
     --gpu ${gpu} \
