@@ -7,10 +7,11 @@ import importlib
 import numpy as np
 import torch.multiprocessing
 from functools import reduce
+from copy import deepcopy
 
 from dotenv import load_dotenv, find_dotenv
 
-from metrics import cm
+from metrics import cm, cka
 
 load_dotenv(find_dotenv())
 
@@ -300,6 +301,8 @@ def main(argv=None):
     forg_tag = np.zeros((max_task, max_task))
     test_loss = np.zeros((max_task, max_task))
 
+    prev_t_model = None  # for CKA
+
     for t, (_, ncla) in enumerate(taskcla):
 
         # Early stop tasks if flag
@@ -376,9 +379,29 @@ def main(argv=None):
         if t == 0 and args.ne_first_task is not None:
             appr.nepochs = args.nepochs
 
+        # Measure distance between previous and current model
+        if t > 0:
+            prev_vect = torch.nn.utils.parameters_to_vector(prev_t_model.parameters())
+            curr_vect = torch.nn.utils.parameters_to_vector(net.model.parameters())
+
+            # L2 distance
+            l2_dist = torch.linalg.vector_norm(prev_vect - curr_vect, 2)
+            logger.log_scalar(task=None, iter=None, name='L2', group=f"Model distance", value=l2_dist.item())
+
+            # Cosine Similarity
+            cos_sim = torch.nn.functional.cosine_similarity(prev_vect, curr_vect)
+            logger.log_scalar(task=None, iter=None, name='Cos-Sim', group=f"Model distance", value=cos_sim.item())
+
         # Test
         for u in range(t + 1):
             test_loss[t, u], acc_taw[t, u], acc_tag[t, u] = appr.eval(u, tst_loader[u])
+
+            # CKA
+            if t > 0:
+                _cka = cka(net.model, prev_t_model, tst_loader[u], device)
+                logger.log_scalar(task=None, iter=None, name=f't_{u}', group=f"cka", value=_cka)
+
+            # FORG
             if u < t:
                 forg_taw[t, u] = acc_taw[:t, u].max(0) - acc_taw[t, u]
                 forg_tag[t, u] = acc_tag[:t, u].max(0) - acc_tag[t, u]
@@ -393,6 +416,9 @@ def main(argv=None):
             logger.log_scalar(task=u, iter=t, name='acc_tag', group='test', value=100 * acc_tag[t, u])
             logger.log_scalar(task=u, iter=t, name='forg_taw', group='test', value=100 * forg_taw[t, u])
             logger.log_scalar(task=u, iter=t, name='forg_tag', group='test', value=100 * forg_tag[t, u])
+
+        # save current model for next CKA calculation
+        prev_t_model = deepcopy(net.model)  # We take only backbone without heads
 
         # Save
         print('Save at ' + os.path.join(args.results_path, full_exp_name))
