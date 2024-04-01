@@ -381,8 +381,8 @@ def main(argv=None):
 
         # Measure distance between previous and current model
         if t > 0:
-            prev_vect = torch.nn.utils.parameters_to_vector(prev_t_model.parameters())
-            curr_vect = torch.nn.utils.parameters_to_vector(net.model.parameters())
+            prev_vect = torch.nn.utils.parameters_to_vector(prev_t_model.parameters()).unsqueeze(0)
+            curr_vect = torch.nn.utils.parameters_to_vector(net.model.parameters()).unsqueeze(0)
 
             # L2 distance
             l2_dist = torch.linalg.vector_norm(prev_vect - curr_vect, 2)
