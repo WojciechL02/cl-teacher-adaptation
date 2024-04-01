@@ -45,8 +45,13 @@ class LLL_Net(nn.Module):
         corresponding offsets
         """
         self.heads.append(nn.Linear(self.out_size, num_outputs))
-        # weights initialization
-        if self.head_init_mode is not None:
+        # first head has the same init (zeros) in all methods
+        if len(self.heads) == 1:
+            nn.init.zeros_(self.heads[-1].weight)
+            nn.init.zeros_(self.heads[-1].bias)
+
+        # weights initialization for other heads
+        elif self.head_init_mode is not None:
             self._initialize_head_weights()
 
         # we re-compute instead of append in case an approach makes changes to the heads
