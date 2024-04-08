@@ -14,6 +14,7 @@ wu_epochs=${9:-0}
 wu_lr=${10:-0.1}
 lr=${11:-0.1}
 head_init=${12}
+stop_at_task=${13:-0}
 
 if [ ${wu_epochs} -gt 0 ]; then
   exp_name="cifar100t${num_tasks}s${nc_first_task}_${tag}_wu_hz"
@@ -33,6 +34,8 @@ if [ ${wu_epochs} -gt 0 ]; then
     --log disk wandb \
     --results-path ${result_path} \
     --tags ${tag} \
+    --cm \
+    --stop-at-task ${stop_at_task} \
     --approach finetuning \
     --scheduler-milestones \
     --num-exemplars 2000 \
@@ -60,6 +63,8 @@ else
     --results-path ${result_path} \
     --tags ${tag} \
     --scheduler-milestones \
+    --cm \
+    --stop-at-task ${stop_at_task} \
     --approach finetuning \
     --num-exemplars 2000 \
     --head-init-mode ${head_init}

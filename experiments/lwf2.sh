@@ -15,6 +15,7 @@ wu_epochs=${10:-0}
 wu_lr=${11:-0.1}
 lr=${12:-0.1}
 head_init=${13}
+stop_at_task=${14:-0}
 
 if [ "${dataset}" = "imagenet_subset_kaggle" ]; then
   clip=1.0
@@ -42,7 +43,10 @@ if [ ${wu_epochs} -gt 0 ]; then
     --results-path ${result_path} \
     --tags ${tag} \
     --scheduler-milestones \
+    --cm \
     --approach lwf \
+    --taskwise-kd \
+    --stop-at-task ${stop_at_task} \
     --lamb ${lamb} \
     --wu-nepochs ${wu_epochs} \
     --wu-lr ${wu_lr} \
@@ -69,7 +73,10 @@ else
     --results-path ${result_path} \
     --tags ${tag} \
     --scheduler-milestones \
+    --cm \
     --approach lwf \
+    --taskwise-kd \
+    --stop-at-task ${stop_at_task} \
     --lamb ${lamb} \
     --head-init-mode ${head_init}
 fi

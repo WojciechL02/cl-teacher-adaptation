@@ -15,6 +15,7 @@ wu_lr=${10:-0.1}
 lr=${11:-0.1}
 lamb=${12}
 head_init=${13}
+stop_at_task=${14:-0}
 
 if [ ${wu_epochs} -gt 0 ]; then
   exp_name="cifar100t${num_tasks}s${nc_first_task}_${tag}_wu_hz"
@@ -35,6 +36,8 @@ if [ ${wu_epochs} -gt 0 ]; then
     --results-path ${result_path} \
     --tags ${tag} \
     --scheduler-milestones \
+    --cm \
+    --stop-at-task ${stop_at_task} \
     --approach ewc \
     --lamb ${lamb} \
     --wu-nepochs ${wu_epochs} \
@@ -61,6 +64,8 @@ else
     --results-path ${result_path} \
     --tags ${tag} \
     --scheduler-milestones \
+    --cm \
+    --stop-at-task ${stop_at_task} \
     --approach ewc \
     --lamb ${lamb} \
     --head-init-mode ${head_init}
