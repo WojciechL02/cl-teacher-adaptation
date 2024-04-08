@@ -447,8 +447,8 @@ class Inc_Learning_Appr:
                 for batch_id, (images, targets) in enumerate(loader):
                     images, targets = images.to(self.device), targets.to(self.device)
                     outputs = self.model(images)
-                    act_avgs[batch_id] = outputs[task_id].mean(dim=1).mean()
-                    act_maxs[batch_id] = outputs[task_id].max(dim=1).values.mean()
+                    act_avgs[0, batch_id] = outputs[task_id].mean(dim=1).mean()
+                    act_maxs[0, batch_id] = outputs[task_id].max(dim=1).values.mean()
 
                 final_avg = act_avgs.mean()
                 final_max = act_maxs.max()
