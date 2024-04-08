@@ -301,9 +301,6 @@ def main(argv=None):
     forg_tag = np.zeros((max_task, max_task))
     test_loss = np.zeros((max_task, max_task))
 
-    # save current model for next CKA calculation
-    prev_t_net = deepcopy(net)  # save also the model from before the training
-
     for t, (_, ncla) in enumerate(taskcla):
 
         # Early stop tasks if flag
@@ -313,6 +310,10 @@ def main(argv=None):
         print('*' * 108)
         print('Task {:2d}'.format(t))
         print('*' * 108)
+
+        # save current model for next CKA calculation
+        prev_t_net = deepcopy(net)  # save also the model from before the training
+        prev_t_net.to(device)
 
         # Add head for current task
         net.add_head(taskcla[t][1])
