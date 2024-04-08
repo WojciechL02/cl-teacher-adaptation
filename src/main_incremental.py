@@ -301,7 +301,8 @@ def main(argv=None):
     forg_tag = np.zeros((max_task, max_task))
     test_loss = np.zeros((max_task, max_task))
 
-    prev_t_net = None  # for CKA
+    # save current model for next CKA calculation
+    prev_t_net = deepcopy(net)  # save also the model from before the training
 
     for t, (_, ncla) in enumerate(taskcla):
 
@@ -380,17 +381,16 @@ def main(argv=None):
             appr.nepochs = args.nepochs
 
         # Measure distance between previous and current model
-        if t > 0:
-            prev_vect = torch.nn.utils.parameters_to_vector(prev_t_net.model.parameters()).unsqueeze(0)
-            curr_vect = torch.nn.utils.parameters_to_vector(net.model.parameters()).unsqueeze(0)
+        prev_vect = torch.nn.utils.parameters_to_vector(prev_t_net.model.parameters()).unsqueeze(0)
+        curr_vect = torch.nn.utils.parameters_to_vector(net.model.parameters()).unsqueeze(0)
 
-            # L2 distance
-            l2_dist = torch.linalg.vector_norm(prev_vect - curr_vect, 2)
-            logger.log_scalar(task=None, iter=None, name='L2', group=f"Model distance", value=l2_dist.item())
+        # L2 distance
+        l2_dist = torch.linalg.vector_norm(prev_vect - curr_vect, 2)
+        logger.log_scalar(task=None, iter=None, name='L2', group=f"Model distance", value=l2_dist.item())
 
-            # Cosine Similarity
-            cos_sim = torch.nn.functional.cosine_similarity(prev_vect, curr_vect)
-            logger.log_scalar(task=None, iter=None, name='Cos-Sim', group=f"Model distance", value=cos_sim.item())
+        # Cosine Similarity
+        cos_sim = torch.nn.functional.cosine_similarity(prev_vect, curr_vect)
+        logger.log_scalar(task=None, iter=None, name='Cos-Sim', group=f"Model distance", value=cos_sim.item())
 
         # Test
         for u in range(t + 1):
@@ -418,7 +418,7 @@ def main(argv=None):
             logger.log_scalar(task=u, iter=t, name='forg_tag', group='test', value=100 * forg_tag[t, u])
 
         # save current model for next CKA calculation
-        prev_t_net = deepcopy(net)  # We take only backbone without heads
+        prev_t_net = deepcopy(net)
 
         # Save
         print('Save at ' + os.path.join(args.results_path, full_exp_name))

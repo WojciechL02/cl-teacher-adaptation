@@ -1,4 +1,5 @@
 import time
+from copy import deepcopy
 import torch
 import numpy as np
 from argparse import ArgumentParser
@@ -310,6 +311,9 @@ class Inc_Learning_Appr:
 
         min_accs_prev = torch.ones((t,), requires_grad=False)
 
+        # Compare head after warmup and after task training
+        head_after_wu = deepcopy(self.model.heads[-1])
+
         # Loop epochs
         for e in range(self.nepochs):
             # Train
@@ -412,6 +416,44 @@ class Inc_Learning_Appr:
             print()
 
         self.model.set_state_dict(best_model)
+
+        # MEASURE LAST HEAD DISTANCE/SIMILARITY
+        if t > 0:
+            head_after_wu_vect = torch.nn.utils.parameters_to_vector(head_after_wu.parameters()).unsqueeze(0)
+            head_curr_vect = torch.nn.utils.parameters_to_vector(self.model.heads[-1].parameters()).unsqueeze(0)
+
+            # L2 distance
+            l2_dist = torch.linalg.vector_norm(head_after_wu_vect - head_curr_vect, 2)
+            self.logger.log_scalar(task=None, iter=None, name='L2 distance', group=f"Last head", value=l2_dist.item())
+
+            # Cosine Similarity
+            cos_sim = torch.nn.functional.cosine_similarity(head_after_wu_vect, head_curr_vect)
+            self.logger.log_scalar(task=None, iter=None, name='Cos-Sim', group=f"Last head", value=cos_sim.item())
+
+            # L2 of the final classifier
+            final_clf_l2 = torch.linalg.vector_norm(head_curr_vect, 2)
+            self.logger.log_scalar(task=None, iter=None, name='clf L2', group=f"Last head", value=final_clf_l2.item())
+
+            self._log_heads_activation_statistics(t)
+
+    def _log_heads_activation_statistics(self, t):
+        self.model.eval()
+        with torch.no_grad():
+            loaders = self.tst_loader[:t + 1]
+
+            for task_id, loader in enumerate(loaders):
+                act_avgs = torch.zeros((1, len(loader)), requires_grad=False)
+                act_maxs = torch.zeros((1, len(loader)), requires_grad=False)
+                for batch_id, (images, targets) in enumerate(loader):
+                    images, targets = images.to(self.device), targets.to(self.device)
+                    outputs = self.model(images)
+                    act_avgs[batch_id] = outputs[task_id].mean(dim=1).mean()
+                    act_maxs[batch_id] = outputs[task_id].max(dim=1).values.mean()
+
+                final_avg = act_avgs.mean()
+                final_max = act_maxs.max()
+                self.logger.log_scalar(task=task_id, iter=None, name='Avg', group='Head activations', value=final_avg.item())
+                self.logger.log_scalar(task=task_id, iter=None, name='Max', group='Head activations', value=final_max.item())
 
     def post_train_process(self, t, trn_loader):
         """Runs after training all the epochs of the task (after the train session)"""
