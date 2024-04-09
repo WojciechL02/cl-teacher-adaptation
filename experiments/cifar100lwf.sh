@@ -26,10 +26,9 @@ lr=0.1
 wu_lr=0.8
 head_init=zeros
 
-for wu_nepochs in 20; do
-  for seed in 0 1 2; do
-    ./experiments/lwf2.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${lamb} ${wu_nepochs} ${wu_lr} ${lr} ${head_init} ${stop_at_task} &
-  done
-  wait
+wu_nepochs=20
 
+for seed in 0 1 2; do
+  ./experiments/lwf2.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${lamb} ${wu_nepochs} ${wu_lr} ${lr} ${head_init} ${stop_at_task} &
 done
+wait
