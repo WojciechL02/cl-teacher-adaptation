@@ -22,7 +22,7 @@ wu_lr=0.8
 lamb=10000
 head_init=zeros
 
-for wu_nepochs in 0 20; do
+for wu_nepochs in 20; do
   for seed in 0 1 2; do
     ./experiments/ewc2.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${wu_nepochs} ${wu_lr} ${lr} ${lamb} ${head_init} ${stop_at_task} &
   done
