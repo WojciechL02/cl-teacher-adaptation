@@ -81,6 +81,9 @@ class MultiLogger(ExperimentLogger):
                 continue
             l.log_result(array, name, step, **kwargs)
 
+    def log_histogram(self, name, sequence, bins):
+        pass
+
     def log_figure(self, name, iter, figure, curtime=None):
         if curtime is None:
             curtime = datetime.now()

@@ -69,6 +69,9 @@ class Logger(ExperimentLogger):
             delimiter="\t",
         )
 
+    def log_histogram(self, name, sequence, bins):
+        pass
+
     def log_figure(self, name, iter, figure, curtime=None):
         curtime = datetime.now()
         figure.savefig(

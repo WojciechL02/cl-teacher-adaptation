@@ -31,6 +31,9 @@ class Logger(ExperimentLogger):
         )
         self.tbwriter.file_writer.flush()
 
+    def log_histogram(self, name, sequence, bins):
+        pass
+
     def log_result(self, array, name, step, **kwargs):
         if array.ndim == 1:
             # log as scalars

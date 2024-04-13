@@ -442,17 +442,21 @@ class Inc_Learning_Appr:
             loaders = self.tst_loader[:t + 1]
 
             for task_id, loader in enumerate(loaders):
-                act_avgs = torch.zeros((1, len(loader)), requires_grad=False)
+                actv = [torch.zeros((len(loader.dataset), self.model.heads[i].out_features)) for i in range(len(self.model.heads))]
                 act_maxs = torch.zeros((1, len(loader)), requires_grad=False)
                 for batch_id, (images, targets) in enumerate(loader):
                     images, targets = images.to(self.device), targets.to(self.device)
                     outputs = self.model(images)
-                    act_avgs[0, batch_id] = outputs[task_id].mean(dim=1).mean()
                     act_maxs[0, batch_id] = outputs[task_id].max(dim=1).values.mean()
 
-                final_avg = act_avgs.mean()
+                    for head_id in range(len(self.model.heads)):
+                        start = batch_id * len(targets)
+                        actv[head_id][start:start + len(targets)] = outputs[head_id]
+
+                for head_id in range(len(actv)):
+                    self.logger.log_histogram(name=f"Head_{head_id}_act_t{task_id}", sequence=actv[head_id].flatten(), bins=100)
+
                 final_max = act_maxs.max()
-                self.logger.log_scalar(task=task_id, iter=None, name='Avg', group='Head activations', value=final_avg.item())
                 self.logger.log_scalar(task=task_id, iter=None, name='Max', group='Head activations', value=final_max.item())
 
     def post_train_process(self, t, trn_loader):
