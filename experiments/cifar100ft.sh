@@ -14,7 +14,7 @@ nc_first_task=10
 stop_at_task=2  # default = 0
 dataset=cifar100_icarl
 network=resnet32
-tag=head_after_wu  # experiment name
+tag=head_after_wu2  # experiment name
 
 num_epochs=100
 lr=0.1
@@ -23,7 +23,16 @@ head_init=zeros
 
 wu_nepochs=20
 
+for wu_wd in 0.0 0.001 0.01 0.03; do
+  for seed in 0 1 2; do
+    ./experiments/ft2.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${wu_nepochs} ${wu_lr} ${wu_wd} ${lr} ${head_init} ${stop_at_task} &
+  done
+  wait
+done
+wait
+
+# without warm-up:
 for seed in 0 1 2; do
-  ./experiments/ft2.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${wu_nepochs} ${wu_lr} ${lr} ${head_init} ${stop_at_task} &
+  ./experiments/ft2.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${0} ${0} ${0} ${lr} ${head_init} ${stop_at_task} &
 done
 wait

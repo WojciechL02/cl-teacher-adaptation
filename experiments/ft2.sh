@@ -12,12 +12,13 @@ network=$7
 num_epochs=$8
 wu_epochs=${9:-0}
 wu_lr=${10:-0.1}
-lr=${11:-0.1}
-head_init=${12}
-stop_at_task=${13:-0}
+wu_wd=${11:-0}
+lr=${12:-0.1}
+head_init=${13}
+stop_at_task=${14:-0}
 
 if [ ${wu_epochs} -gt 0 ]; then
-  exp_name="cifar100t${num_tasks}s${nc_first_task}_${tag}_wu_hz_no_wd"
+  exp_name="cifar100t${num_tasks}s${nc_first_task}_${tag}_wu_hz_wd:${wu_wd}"
   result_path="results/${tag}/ft_wu_hz_${seed}"
   python3 src/main_incremental.py \
     --exp-name ${exp_name} \
@@ -28,7 +29,7 @@ if [ ${wu_epochs} -gt 0 ]; then
     --network ${network} \
     --use-test-as-val \
     --lr ${lr} \
-    --wu-wd 0.0 \
+    --wu-wd ${wu_wd} \
     --nepochs ${num_epochs} \
     --batch-size 128 \
     --seed ${seed} \
@@ -46,7 +47,7 @@ if [ ${wu_epochs} -gt 0 ]; then
     --wu-scheduler cosine \
     --head-init-mode ${head_init}
 else
-  exp_name="cifar100t${num_tasks}s${nc_first_task}_${tag}_hz_no_wd"
+  exp_name="cifar100t${num_tasks}s${nc_first_task}_${tag}_hz"
   result_path="results/${tag}/ft_hz_${seed}"
   python3 src/main_incremental.py \
     --exp-name ${exp_name} \
@@ -57,7 +58,7 @@ else
     --network ${network} \
     --use-test-as-val \
     --lr ${lr} \
-    --wu-wd 0.0 \
+    --wu-wd ${wu_wd} \
     --nepochs ${num_epochs} \
     --batch-size 128 \
     --seed ${seed} \
