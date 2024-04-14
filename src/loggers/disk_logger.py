@@ -69,7 +69,7 @@ class Logger(ExperimentLogger):
             delimiter="\t",
         )
 
-    def log_histogram(self, name, sequence, bins):
+    def log_histogram(self, group, name, task, np_hist):
         pass
 
     def log_figure(self, name, iter, figure, curtime=None):
