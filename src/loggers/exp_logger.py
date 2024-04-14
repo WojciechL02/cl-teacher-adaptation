@@ -27,6 +27,9 @@ class ExperimentLogger:
     def log_figure(self, name, iter, figure, curtime=None):
         pass
 
+    def log_histogram(self, group, name, task, np_hist):
+        pass
+
     def save_model(self, state_dict, task):
         pass
 
@@ -81,14 +84,15 @@ class MultiLogger(ExperimentLogger):
                 continue
             l.log_result(array, name, step, **kwargs)
 
-    def log_histogram(self, group, name, task, np_hist):
-        pass
-
     def log_figure(self, name, iter, figure, curtime=None):
         if curtime is None:
             curtime = datetime.now()
         for l in self.loggers:
             l.log_figure(name, iter, figure, curtime)
+
+    def log_histogram(self, group, name, task, np_hist):
+        for l in self.loggers:
+            l.log_histogram(group, name, task, np_hist)
 
     def save_model(self, state_dict, task):
         if self.save_models:
