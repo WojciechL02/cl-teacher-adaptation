@@ -87,10 +87,12 @@ class Logger(ExperimentLogger):
         wandb.log({name: _plot_to_wandb(plot)})
 
     def log_histogram(self, group, name, task, sequence):
-        data = [[v] for v in sequence]
-        table = wandb.Table(data=data, columns=["values"])
+        histogram = sns.histplot(data=sequence, bins=100).get_figure()
+        histogram.set_title(f"{name}/t_{task}")
+        histogram.set_xlabel("Activation value")
+        histogram.set_ylabel("Count")
         key = "{}_{}/t_{}".format(group, name, task)
-        wandb.log({key: wandb.plot.histogram(table, "values", title=key)})
+        wandb.log({key: _plot_to_wandb(histogram)})
 
     def log_figure(self, name, iter, figure, curtime=None):
         wandb.log({name: _plot_to_wandb(figure)})
