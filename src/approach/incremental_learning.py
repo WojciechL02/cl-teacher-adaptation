@@ -454,8 +454,9 @@ class Inc_Learning_Appr:
                         actv[head_id][start:start + len(targets)] = outputs[head_id]
 
                 for head_id in range(len(actv)):
-                    hist = np.histogram(actv[head_id].flatten().cpu().numpy(), bins=100)
-                    self.logger.log_histogram(group="Histograms", name=f"Head_{head_id}_act", task=task_id, np_hist=hist)
+                    # hist = np.histogram(actv[head_id].flatten().cpu().numpy(), bins=100)
+                    values = actv[head_id].flatten().cpu().numpy()
+                    self.logger.log_histogram(group="Histograms", name=f"Head_{head_id}_act", task=task_id, sequence=values)
 
                 final_max = act_maxs.max()
                 self.logger.log_scalar(task=task_id, iter=None, name='Max', group='Head activations', value=final_max.item())

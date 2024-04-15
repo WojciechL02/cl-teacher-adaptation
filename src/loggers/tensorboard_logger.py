@@ -31,7 +31,7 @@ class Logger(ExperimentLogger):
         )
         self.tbwriter.file_writer.flush()
 
-    def log_histogram(self, group, name, task, np_hist):
+    def log_histogram(self, group, name, task, sequence):
         pass
 
     def log_result(self, array, name, step, **kwargs):
