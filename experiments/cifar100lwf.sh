@@ -28,7 +28,7 @@ head_init=zeros
 
 wu_nepochs=20
 
-for wu_wd in 0.0 0.001 0.01 0.03; do
+for wu_wd in 0.1 0.2 0.35 0.5; do
   for seed in 0 1 2; do
     ./experiments/lwf2.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${lamb} ${wu_nepochs} ${wu_lr} ${wu_wd} ${lr} ${head_init} ${stop_at_task} &
   done
@@ -37,7 +37,7 @@ done
 wait
 
 # without warm-up:
-for seed in 0 1 2; do
-  ./experiments/lwf2.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${lamb} ${0} ${0} ${0} ${lr} ${head_init} ${stop_at_task} &
-done
-wait
+#for seed in 0 1 2; do
+#  ./experiments/lwf2.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${lamb} ${0} ${0} ${0} ${lr} ${head_init} ${stop_at_task} &
+#done
+#wait
