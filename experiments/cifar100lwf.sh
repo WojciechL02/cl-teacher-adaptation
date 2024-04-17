@@ -38,6 +38,6 @@ wait
 
 # without warm-up:
 #for seed in 0 1 2; do
-#  ./experiments/lwf2.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${lamb} ${0} ${0} ${0} ${lr} ${head_init} ${stop_at_task} &
+#  ./experiments/lwf2.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${lamb} 0 0 0.0 ${lr} ${head_init} ${stop_at_task} &
 #done
 #wait

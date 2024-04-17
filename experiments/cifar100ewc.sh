@@ -34,6 +34,6 @@ wait
 
 # without warm-up:
 #for seed in 0 1 2; do
-#  ./experiments/ewc2.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${0} ${0} ${0} ${lr} ${lamb} ${head_init} ${stop_at_task} &
+#  ./experiments/ewc2.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} 0 0 0.0 ${lr} ${lamb} ${head_init} ${stop_at_task} &
 #done
 #wait
