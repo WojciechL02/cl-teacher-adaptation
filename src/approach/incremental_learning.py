@@ -82,6 +82,14 @@ class Inc_Learning_Appr:
 
         # Warm-up phase
         if self.warmup_epochs and t > 0:
+
+            # Log acc_tag before warmup ---------------------------------------------------------
+            outputs = self._evaluate(t, debug=True)
+            for name, value in outputs.items():
+                if name == "tag_acc_current_task" or name == "tag_acc_all_tasks":
+                    self.logger.log_scalar(task=None, iter=None, name=f"before_wu_{name}", group=f"warmup_t{t}", value=value)
+            # -----------------------------------------------------------------------------------
+
             prev_heads_b_norm = torch.cat([h.bias for h in self.model.heads[:-1]], dim=0).detach().norm().item()
             prev_heads_w_norm = torch.cat([h.weight for h in self.model.heads[:-1]], dim=0).detach().norm().item()
             self._log_weight_norms(t, prev_heads_w_norm, prev_heads_b_norm,
@@ -109,6 +117,8 @@ class Inc_Learning_Appr:
             best_loss = float('inf')
             best_model = self.model.state_dict()
 
+            new_trn_loader = torch.utils.data.DataLoader(trn_loader.dataset, batch_size=512, shuffle=True, num_workers=trn_loader.num_workers, pin_memory=trn_loader.pin_memory)
+
             # Loop epochs -- train warm-up head
             for e in range(self.warmup_epochs):
                 warmupclock0 = time.time()
@@ -119,7 +129,7 @@ class Inc_Learning_Appr:
                     self.model.train()
                 self.model.heads[-1].train()
 
-                for images, targets in trn_loader:
+                for images, targets in new_trn_loader:
                     images = images.to(self.device, non_blocking=True)
                     targets = targets.to(self.device, non_blocking=True)
 
@@ -135,7 +145,7 @@ class Inc_Learning_Appr:
                 with torch.no_grad():
                     total_loss, total_acc_taw = 0, 0
                     self.model.eval()
-                    for images, targets in trn_loader:
+                    for images, targets in new_trn_loader:
                         images, targets = images.to(self.device), targets.to(self.device)
                         outputs = self.model(images)
                         loss = self.warmup_loss(outputs[t], targets - self.model.task_offset[t])
@@ -146,7 +156,7 @@ class Inc_Learning_Appr:
                         hits_taw = (pred == targets).float()
                         total_loss += loss.item() * len(targets)
                         total_acc_taw += hits_taw.sum().item()
-                total_num = len(trn_loader.dataset.labels)
+                total_num = len(new_trn_loader.dataset.labels)
                 trn_loss, trn_acc = total_loss / total_num, total_acc_taw / total_num
                 warmupclock2 = time.time()
                 print('| Warm-up Epoch {:3d}, time={:5.1f}s/{:5.1f}s | Train: loss={:.3f}, TAw acc={:5.1f}% |'.format(
@@ -155,24 +165,24 @@ class Inc_Learning_Appr:
                 self.logger.log_scalar(task=None, iter=e + 1, name="trn_acc", value=100 * trn_acc, group=f"warmup_t{t}")
 
                 # Evaluate -------------------------------------------------------------------------
-                # warmupclock3 = time.time()
-                # outputs = self._evaluate(t, debug=self.debug)
-                # for name, value in outputs.items():
-                #     self.logger.log_scalar(task=None, iter=e + 1, name=name, group=f"warmup_t{t}",
-                #                            value=value)
+                warmupclock3 = time.time()
+                outputs = self._evaluate(t, debug=True)
+                for name, value in outputs.items():
+                    if name == "tag_acc_current_task" or name == "tag_acc_all_tasks":
+                        self.logger.log_scalar(task=None, iter=e + 1, name=name, group=f"warmup_t{t}", value=value)
                 # if self.debug:
                 #     self.logger.log_scalar(task=None, iter=e + 1, name='lr', group=f"warmup_t{t}",
                 #                            value=optimizer.param_groups[0]["lr"])
                 #     self._log_weight_norms(t, prev_heads_w_norm, prev_heads_b_norm,
                 #                            self.model.heads[-1].weight.detach().norm().item(),
                 #                            self.model.heads[-1].bias.detach().norm().item())
-                #
-                # warmupclock4 = time.time()
-                # print('| Epoch {:3d}, time={:5.1f}s | Eval: loss={:.3f}, TAg loss={:.3f}, TAw acc={:5.1f}% |'.format(
-                #     e + 1, warmupclock4 - warmupclock3, outputs['ce_taw_current_task'],
-                #     outputs['ce_tag_current_task'],
-                #     100 * outputs['taw_acc_current_task']), end=''
-                # )
+
+                warmupclock4 = time.time()
+                print('| Epoch {:3d}, time={:5.1f}s | Eval: loss={:.3f}, TAg loss={:.3f}, TAw acc={:5.1f}% |'.format(
+                    e + 1, warmupclock4 - warmupclock3, outputs['ce_taw_current_task'],
+                    outputs['ce_tag_current_task'],
+                    100 * outputs['taw_acc_current_task']), end=''
+                )
                 # -----------------------------------------------------------------------------------
 
                 if self.warmup_scheduler == 'plateau':
@@ -264,18 +274,22 @@ class Inc_Learning_Appr:
             self.model.eval()
             for task_id, loader in enumerate(loaders):
                 total_acc_tag = 0.
+                total_acc_taw = 0.
                 total_num = 0
                 for images, targets in loader:
                     images, targets = images.to(self.device), targets.to(self.device)
                     # Forward current model
                     outputs = self.model(images)
-                    _, hits_tag = self.calculate_metrics(outputs, targets)
+                    hits_taw, hits_tag = self.calculate_metrics(outputs, targets)
                     # Log
                     total_acc_tag += hits_tag.sum().data.cpu().numpy().item()
+                    total_acc_taw += hits_taw.sum().data.cpu().numpy().item()
                     total_num += len(targets)
 
                 acc_tag = total_acc_tag / total_num
+                acc_taw = total_acc_taw / total_num
                 self.logger.log_scalar(task=task_id, iter=None, name="acc_tag", value=100 * acc_tag, group="cont_eval")
+                self.logger.log_scalar(task=task_id, iter=None, name="acc_taw", value=100 * acc_taw, group="cont_eval")
                 if task_id < t:
                     sum_acc += acc_tag
                     prev_t_acc[task_id] = acc_tag

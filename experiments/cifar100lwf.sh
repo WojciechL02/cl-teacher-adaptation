@@ -11,10 +11,10 @@ conda activate FACIL
 
 num_tasks=10
 nc_first_task=10
-stop_at_task=5  # default = 0
+stop_at_task=2  # default = 0
 dataset=cifar100_icarl
 network=resnet32
-tag=head_after_wu_5t  # experiment name
+tag=head_after_wu3  # experiment name
 
 lamb=1  # best = 10
 lamb_mc=0.5
@@ -23,12 +23,12 @@ gamma=1e-3
 
 num_epochs=100
 lr=0.1
-wu_lr=0.8
+wu_lr=0.1
 head_init=zeros
 
 wu_nepochs=20
 
-for wu_wd in 0.0 0.03 0.1 0.35 0.5; do
+for wu_wd in 0.0 0.03 0.1 0.3 0.5 1.0; do
   for seed in 0 1 2; do
     ./experiments/lwf2.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${lamb} ${wu_nepochs} ${wu_lr} ${wu_wd} ${lr} ${head_init} ${stop_at_task} &
   done
