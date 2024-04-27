@@ -222,7 +222,7 @@ class Inc_Learning_Appr:
 
         with torch.no_grad():
             for i, loader in enumerate(loaders):
-                if not self.debug and i != len(loaders) - 1:
+                if not debug and i != len(loaders) - 1:
                     continue
 
                 total_acc_taw, total_acc_tag, total_ce_taw, total_ce_tag, total_num = 0, 0, 0, 0, 0
