@@ -21,11 +21,9 @@ beta=10
 gamma=1e-3
 
 seed=0
-wu_nepochs=0
-wu_lr=0
+num_epochs=100
 lr=0.1
+wu_nepochs=20
+wu_lr=0.8
 
-for num_epochs in 200 100 50; do
-  ./experiments/lwf.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${lamb} ${wu_nepochs} ${wu_lr} ${lr} &
-done
-wait
+./experiments/lwf3.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${lamb} ${wu_nepochs} ${wu_lr} ${lr}

@@ -1,4 +1,5 @@
 import time
+from copy import deepcopy
 import torch
 import numpy as np
 from argparse import ArgumentParser
@@ -14,7 +15,7 @@ class Inc_Learning_Appr:
                  momentum=0, wd=0, multi_softmax=False, wu_nepochs=0, wu_lr=1e-1, wu_fix_bn=False,
                  wu_scheduler='constant', wu_patience=None, wu_wd=0., fix_bn=False,
                  eval_on_train=False, select_best_model_by_val_loss=True, logger: ExperimentLogger = None,
-                 exemplars_dataset: ExemplarsDataset = None, scheduler_milestones=None, no_learning=False):
+                 exemplars_dataset: ExemplarsDataset = None, scheduler_milestones=False, no_learning=False):
         self.model = model
         self.device = device
         self.nepochs = nepochs
@@ -44,6 +45,8 @@ class Inc_Learning_Appr:
         self.debug = False
         self.no_learning = no_learning
 
+        self.last_e_accs = None # variable for stability-gap metric
+
     @staticmethod
     def extra_parser(args):
         """Returns a parser containing the approach specific parameters"""
@@ -62,11 +65,11 @@ class Inc_Learning_Appr:
         return torch.optim.SGD(self.model.parameters(), lr=self.lr, weight_decay=self.wd, momentum=self.momentum)
 
     def _get_scheduler(self):
-        if self.scheduler_milestones is not None:
-            return torch.optim.lr_scheduler.MultiStepLR(optimizer=self.optimizer, milestones=self.scheduler_milestones, gamma=0.1)
-        else:
+        if self.scheduler_milestones:
+            # return torch.optim.lr_scheduler.MultiStepLR(optimizer=self.optimizer, milestones=self.scheduler_milestones, gamma=0.1)
             return torch.optim.lr_scheduler.LinearLR(optimizer=self.optimizer, start_factor=1.0, end_factor=0.01, total_iters=self.nepochs)
-            # return None
+        else:
+            return None
 
     def train(self, t, trn_loader, val_loader):
         """Main train structure"""
@@ -79,6 +82,14 @@ class Inc_Learning_Appr:
 
         # Warm-up phase
         if self.warmup_epochs and t > 0:
+
+            # Log acc_tag before warmup ---------------------------------------------------------
+            outputs = self._evaluate(t, debug=True)
+            for name, value in outputs.items():
+                if name == "tag_acc_current_task" or name == "tag_acc_all_tasks":
+                    self.logger.log_scalar(task=None, iter=None, name=f"before_wu_{name}", group=f"warmup_t{t}", value=value)
+            # -----------------------------------------------------------------------------------
+
             prev_heads_b_norm = torch.cat([h.bias for h in self.model.heads[:-1]], dim=0).detach().norm().item()
             prev_heads_w_norm = torch.cat([h.weight for h in self.model.heads[:-1]], dim=0).detach().norm().item()
             self._log_weight_norms(t, prev_heads_w_norm, prev_heads_b_norm,
@@ -106,6 +117,8 @@ class Inc_Learning_Appr:
             best_loss = float('inf')
             best_model = self.model.state_dict()
 
+            new_trn_loader = torch.utils.data.DataLoader(trn_loader.dataset, batch_size=512, shuffle=True, num_workers=trn_loader.num_workers, pin_memory=trn_loader.pin_memory)
+
             # Loop epochs -- train warm-up head
             for e in range(self.warmup_epochs):
                 warmupclock0 = time.time()
@@ -116,7 +129,7 @@ class Inc_Learning_Appr:
                     self.model.train()
                 self.model.heads[-1].train()
 
-                for images, targets in trn_loader:
+                for images, targets in new_trn_loader:
                     images = images.to(self.device, non_blocking=True)
                     targets = targets.to(self.device, non_blocking=True)
 
@@ -132,7 +145,7 @@ class Inc_Learning_Appr:
                 with torch.no_grad():
                     total_loss, total_acc_taw = 0, 0
                     self.model.eval()
-                    for images, targets in trn_loader:
+                    for images, targets in new_trn_loader:
                         images, targets = images.to(self.device), targets.to(self.device)
                         outputs = self.model(images)
                         loss = self.warmup_loss(outputs[t], targets - self.model.task_offset[t])
@@ -143,7 +156,7 @@ class Inc_Learning_Appr:
                         hits_taw = (pred == targets).float()
                         total_loss += loss.item() * len(targets)
                         total_acc_taw += hits_taw.sum().item()
-                total_num = len(trn_loader.dataset.labels)
+                total_num = len(new_trn_loader.dataset.labels)
                 trn_loss, trn_acc = total_loss / total_num, total_acc_taw / total_num
                 warmupclock2 = time.time()
                 print('| Warm-up Epoch {:3d}, time={:5.1f}s/{:5.1f}s | Train: loss={:.3f}, TAw acc={:5.1f}% |'.format(
@@ -152,24 +165,24 @@ class Inc_Learning_Appr:
                 self.logger.log_scalar(task=None, iter=e + 1, name="trn_acc", value=100 * trn_acc, group=f"warmup_t{t}")
 
                 # Evaluate -------------------------------------------------------------------------
-                # warmupclock3 = time.time()
-                # outputs = self._evaluate(t, debug=self.debug)
-                # for name, value in outputs.items():
-                #     self.logger.log_scalar(task=None, iter=e + 1, name=name, group=f"warmup_t{t}",
-                #                            value=value)
+                warmupclock3 = time.time()
+                outputs = self._evaluate(t, debug=True)
+                for name, value in outputs.items():
+                    if name == "tag_acc_current_task" or name == "tag_acc_all_tasks":
+                        self.logger.log_scalar(task=None, iter=e + 1, name=name, group=f"warmup_t{t}", value=value)
                 # if self.debug:
                 #     self.logger.log_scalar(task=None, iter=e + 1, name='lr', group=f"warmup_t{t}",
                 #                            value=optimizer.param_groups[0]["lr"])
                 #     self._log_weight_norms(t, prev_heads_w_norm, prev_heads_b_norm,
                 #                            self.model.heads[-1].weight.detach().norm().item(),
                 #                            self.model.heads[-1].bias.detach().norm().item())
-                #
-                # warmupclock4 = time.time()
-                # print('| Epoch {:3d}, time={:5.1f}s | Eval: loss={:.3f}, TAg loss={:.3f}, TAw acc={:5.1f}% |'.format(
-                #     e + 1, warmupclock4 - warmupclock3, outputs['ce_taw_current_task'],
-                #     outputs['ce_tag_current_task'],
-                #     100 * outputs['taw_acc_current_task']), end=''
-                # )
+
+                warmupclock4 = time.time()
+                print('| Epoch {:3d}, time={:5.1f}s | Eval: loss={:.3f}, TAg loss={:.3f}, TAw acc={:5.1f}% |'.format(
+                    e + 1, warmupclock4 - warmupclock3, outputs['ce_taw_current_task'],
+                    outputs['ce_tag_current_task'],
+                    100 * outputs['taw_acc_current_task']), end=''
+                )
                 # -----------------------------------------------------------------------------------
 
                 if self.warmup_scheduler == 'plateau':
@@ -209,7 +222,7 @@ class Inc_Learning_Appr:
 
         with torch.no_grad():
             for i, loader in enumerate(loaders):
-                if not self.debug and i != len(loaders) - 1:
+                if not debug and i != len(loaders) - 1:
                     continue
 
                 total_acc_taw, total_acc_tag, total_ce_taw, total_ce_tag, total_num = 0, 0, 0, 0, 0
@@ -252,19 +265,43 @@ class Inc_Learning_Appr:
         return output
 
     def _continual_evaluation_step(self, t):
-        if t > 0:
+        prev_t_acc = torch.zeros((t,), requires_grad=False)
+        current_t_acc = 0.
+        sum_acc = 0.
+        with torch.no_grad():
             loaders = self.tst_loader[:t + 1]
 
-            sum_acc = 0.
-
+            self.model.eval()
             for task_id, loader in enumerate(loaders):
-                _, _, acc_tag = self.eval(task_id, loader)
+                total_acc_tag = 0.
+                total_acc_taw = 0.
+                total_num = 0
+                for images, targets in loader:
+                    images, targets = images.to(self.device), targets.to(self.device)
+                    # Forward current model
+                    outputs = self.model(images)
+                    hits_taw, hits_tag = self.calculate_metrics(outputs, targets)
+                    # Log
+                    total_acc_tag += hits_tag.sum().data.cpu().numpy().item()
+                    total_acc_taw += hits_taw.sum().data.cpu().numpy().item()
+                    total_num += len(targets)
+
+                acc_tag = total_acc_tag / total_num
+                acc_taw = total_acc_taw / total_num
                 self.logger.log_scalar(task=task_id, iter=None, name="acc_tag", value=100 * acc_tag, group="cont_eval")
+                self.logger.log_scalar(task=task_id, iter=None, name="acc_taw", value=100 * acc_taw, group="cont_eval")
                 if task_id < t:
                     sum_acc += acc_tag
+                    prev_t_acc[task_id] = acc_tag
+                else:
+                    current_t_acc = acc_tag
 
-            # Average accuracy over all previous tasks
-            self.logger.log_scalar(task=None, iter=None, name="avg_acc_tag", value=sum_acc / t, group="cont_eval")
+            if t > 0:
+                # Average accuracy over all previous tasks
+                self.logger.log_scalar(task=None, iter=None, name="avg_acc_tag", value=100 * sum_acc / t, group="cont_eval")
+        avg_prev_acc = sum_acc / t if t > 0 else 0.
+        return prev_t_acc, current_t_acc, avg_prev_acc
+        # acc poprzednich tasków, acc na aktualnym tasku, średnia z poprzednich tasków
 
     def _log_weight_norms(self, t, prev_w, prev_b, new_w, new_b):
         self.logger.log_scalar(task=None, iter=None, name='prev_heads_w_norm', group=f"wu_w_t{t}",
@@ -286,15 +323,61 @@ class Inc_Learning_Appr:
         self.optimizer = self._get_optimizer()
         self.scheduler = self._get_scheduler()
 
+        min_accs_prev = torch.ones((t,), requires_grad=False)
+
+        # Compare head after warmup and after task training
+        head_after_wu = deepcopy(self.model.heads[-1])
+
         # Loop epochs
         for e in range(self.nepochs):
             # Train
             clock0 = time.time()
             self.train_epoch(t, trn_loader)
-            self._continual_evaluation_step(t)
+
+            # CONTINUAL EVALUATION
+            ####################################################################
+            prev_t_accs, current_acc, avg_prev_acc = self._continual_evaluation_step(t)
+
+            # save accs on last epoch of task 0
+            if t == 0 and e == self.nepochs - 1:
+                self.last_e_accs = torch.tensor([current_acc])
+
+            if t > 0:
+                # min-ACC
+                min_accs_prev = torch.minimum(min_accs_prev, prev_t_accs)
+                min_acc = min_accs_prev.mean().item()
+                self.logger.log_scalar(task=None, iter=None, name="min_acc", value=100 * min_acc, group="cont_eval")
+
+                # WC-ACC
+                k = t + 1
+                wc_acc = (1 / k) * current_acc + (1 - (1 / k)) * min_acc
+                self.logger.log_scalar(task=None, iter=None, name="wc_acc", value=100 * wc_acc, group="cont_eval")
+
+                # in last epoch of tasks > 0
+                if e == self.nepochs - 1:
+                    # Stability Gap
+                    sg = self.last_e_accs - min_accs_prev
+                    sg_normalized = torch.div(sg, self.last_e_accs)
+                    # Recovery
+                    rec = prev_t_accs - min_accs_prev  # in last epoch prev_t_accs is final_acc of prev tasks
+                    rec_normalized = torch.div(rec, self.last_e_accs)
+                    # Log SG and REC
+                    for ts in range(sg.shape[0]):
+                        self.logger.log_scalar(task=ts, iter=None, name="stability_gap", value=100 * sg[ts].item(), group="cont_eval")
+                        self.logger.log_scalar(task=ts, iter=None, name="stability_gap_normal", value=100 * sg_normalized[ts].item(), group="cont_eval")
+                        self.logger.log_scalar(task=None, iter=None, name="stability_gap_avg", value=100 * sg.mean().item(), group="cont_eval")
+
+                        self.logger.log_scalar(task=ts, iter=None, name="recovery", value=100 * rec[ts].item(), group="cont_eval")
+                        self.logger.log_scalar(task=ts, iter=None, name="recovery_normal", value=100 * rec_normalized[ts].item(), group="cont_eval")
+                        self.logger.log_scalar(task=None, iter=None, name="recovery_avg", value=100 * rec.mean().item(), group="cont_eval")
+
+                    # New last acc of prev tasks (current task becomes a prev task)
+                    self.last_e_accs = torch.cat((prev_t_accs, torch.tensor([current_acc])))
+            ####################################################################
+
             clock1 = time.time()
             if self.eval_on_train:
-                train_loss, train_acc, _ = self.eval(t, trn_loader)
+                train_loss, train_acc, _ = self.eval(t, trn_loader, log_partial_loss=False)
                 clock2 = time.time()
                 print('| Epoch {:3d}, time={:5.1f}s/{:5.1f}s | Train: loss={:.3f}, TAw acc={:5.1f}% |'.format(
                     e + 1, clock1 - clock0, clock2 - clock1, train_loss, 100 * train_acc), end='')
@@ -305,7 +388,7 @@ class Inc_Learning_Appr:
 
             # Valid
             clock3 = time.time()
-            valid_loss, valid_acc, _ = self.eval(t, val_loader)
+            valid_loss, valid_acc, _ = self.eval(t, val_loader, log_partial_loss=True)
             clock4 = time.time()
             print(' Valid: time={:5.1f}s loss={:.3f}, TAw acc={:5.1f}% |'.format(
                 clock4 - clock3, valid_loss, 100 * valid_acc), end='')
@@ -348,6 +431,50 @@ class Inc_Learning_Appr:
 
         self.model.set_state_dict(best_model)
 
+        # MEASURE LAST HEAD DISTANCE/SIMILARITY
+        if t > 0:
+            head_after_wu_vect = torch.nn.utils.parameters_to_vector(head_after_wu.parameters()).unsqueeze(0)
+            head_curr_vect = torch.nn.utils.parameters_to_vector(self.model.heads[-1].parameters()).unsqueeze(0)
+
+            # L2 distance
+            l2_dist = torch.linalg.vector_norm(head_after_wu_vect - head_curr_vect, 2)
+            self.logger.log_scalar(task=None, iter=None, name='L2 distance', group=f"Last head", value=l2_dist.item())
+
+            # Cosine Similarity
+            cos_sim = torch.nn.functional.cosine_similarity(head_after_wu_vect, head_curr_vect)
+            self.logger.log_scalar(task=None, iter=None, name='Cos-Sim', group=f"Last head", value=cos_sim.item())
+
+            # L2 of the final classifier
+            final_clf_l2 = torch.linalg.vector_norm(head_curr_vect, 2)
+            self.logger.log_scalar(task=None, iter=None, name='clf L2', group=f"Last head", value=final_clf_l2.item())
+
+            self._log_heads_activation_statistics(t)
+
+    def _log_heads_activation_statistics(self, t):
+        self.model.eval()
+        with torch.no_grad():
+            loaders = self.tst_loader[:t + 1]
+
+            for task_id, loader in enumerate(loaders):
+                actv = [torch.zeros((len(loader.dataset), self.model.heads[i].out_features)) for i in range(len(self.model.heads))]
+                act_maxs = torch.zeros((1, len(loader)), requires_grad=False)
+                for batch_id, (images, targets) in enumerate(loader):
+                    images, targets = images.to(self.device), targets.to(self.device)
+                    outputs = self.model(images)
+                    act_maxs[0, batch_id] = outputs[task_id].max(dim=1).values.mean()
+
+                    for head_id in range(len(self.model.heads)):
+                        start = batch_id * len(targets)
+                        actv[head_id][start:start + len(targets)] = outputs[head_id]
+
+                for head_id in range(len(actv)):
+                    # hist = np.histogram(actv[head_id].flatten().cpu().numpy(), bins=100)
+                    values = actv[head_id].flatten().cpu().numpy()
+                    self.logger.log_histogram(group="Histograms", name=f"Head_{head_id}_act", task=task_id, sequence=values)
+
+                final_max = act_maxs.max()
+                self.logger.log_scalar(task=task_id, iter=None, name='Max', group='Head activations', value=final_max.item())
+
     def post_train_process(self, t, trn_loader):
         """Runs after training all the epochs of the task (after the train session)"""
         pass
@@ -370,7 +497,7 @@ class Inc_Learning_Appr:
         if self.scheduler is not None:
             self.scheduler.step()
 
-    def eval(self, t, val_loader):
+    def eval(self, t, val_loader, log_partial_loss=False):
         """Contains the evaluation code"""
         with torch.no_grad():
             total_loss, total_acc_taw, total_acc_tag, total_num = 0, 0, 0, 0
@@ -382,6 +509,9 @@ class Inc_Learning_Appr:
                 outputs = self.model(images)
                 loss = self.criterion(t, outputs, targets)
                 hits_taw, hits_tag = self.calculate_metrics(outputs, targets)
+
+                hits_tag / len(targets)
+
                 # Log
                 total_loss += loss.item() * len(targets)
                 total_acc_taw += hits_taw.sum().item()
@@ -405,7 +535,6 @@ class Inc_Learning_Appr:
             pred = torch.cat(outputs, dim=1).argmax(1)
         hits_tag = (pred == targets).float()
         return hits_taw, hits_tag
-
     def criterion(self, t, outputs, targets):
         """Returns the loss value"""
         return torch.nn.functional.cross_entropy(outputs[t], targets - self.model.task_offset[t])

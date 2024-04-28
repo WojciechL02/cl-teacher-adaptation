@@ -7,10 +7,11 @@ import importlib
 import numpy as np
 import torch.multiprocessing
 from functools import reduce
+from copy import deepcopy
 
 from dotenv import load_dotenv, find_dotenv
 
-from metrics import cm
+from metrics import cm, cka
 
 load_dotenv(find_dotenv())
 
@@ -104,16 +105,16 @@ def main(argv=None):
                         help='Number of epochs per training session (default=%(default)s)')
     parser.add_argument('--lr', default=0.1, type=float, required=False,
                         help='Starting learning rate (default=%(default)s)')
-    parser.add_argument('--scheduler-milestones', default=None, nargs='+', type=int, required=False,
-                        help='Milestones for learning rate scheduler, overrides lr-patience scheme, '
-                             'if set to None scheduler will not be used (default=%(default)s)')  # default=[60, 120, 160]
+    parser.add_argument('--scheduler-milestones', default=False, action='store_true', required=False,
+                        help='If True, then LinearLR scheduler will be used, '
+                             'if set to False scheduler will not be used (default=%(default)s)')  # default=[60, 120, 160]
     parser.add_argument('--lr-min', default=1e-4, type=float, required=False,
                         help='Minimum learning rate (default=%(default)s)')
     parser.add_argument('--lr-factor', default=3, type=float, required=False,
                         help='Learning rate decreasing factor (default=%(default)s)')
     parser.add_argument('--lr-patience', default=5, type=int, required=False,
                         help='Maximum patience to wait before decreasing learning rate (default=%(default)s)')
-    parser.add_argument('--clipping', default=100., type=float, required=False,
+    parser.add_argument('--clipping', default=10000., type=float, required=False,
                         help='Clip gradient norm (default=%(default)s)')
     parser.add_argument('--momentum', default=0.0, type=float, required=False,
                         help='Momentum factor (default=%(default)s)')
@@ -310,6 +311,10 @@ def main(argv=None):
         print('Task {:2d}'.format(t))
         print('*' * 108)
 
+        # save current model for next CKA calculation
+        prev_t_net = deepcopy(net)  # save also the model from before the training
+        prev_t_net.to(device)
+
         # Add head for current task
         net.add_head(taskcla[t][1])
         net.to(device)
@@ -355,8 +360,8 @@ def main(argv=None):
             model_tag += "_ep" + str(args.nepochs) + "_bs" + str(args.batch_size) + "_lr" + str(args.lr) \
                          + "_wd" + str(args.weight_decay) + "_m" + str(args.momentum) + "_clip" \
                          + str(args.clipping)
-            if args.scheduler_milestones is not None:
-                model_tag += "_sched" + "_".join([str(m) for m in args.scheduler_milestones])
+            # if args.scheduler_milestones is not None:
+            #     model_tag += "_sched" + "_".join([str(m) for m in args.scheduler_milestones])
             model_ckpt_dir = os.path.join("checkpoints", exp_tag, model_tag)
             model_ckpt_path = os.path.join(model_ckpt_dir, "model_seed_" + str(args.seed) + ".ckpt")
             if os.path.exists(model_ckpt_path):
@@ -376,9 +381,28 @@ def main(argv=None):
         if t == 0 and args.ne_first_task is not None:
             appr.nepochs = args.nepochs
 
+        # Measure distance between previous and current model
+        prev_vect = torch.nn.utils.parameters_to_vector(prev_t_net.model.parameters()).unsqueeze(0)
+        curr_vect = torch.nn.utils.parameters_to_vector(net.model.parameters()).unsqueeze(0)
+
+        # L2 distance
+        l2_dist = torch.linalg.vector_norm(prev_vect - curr_vect, 2)
+        logger.log_scalar(task=None, iter=None, name='L2', group=f"Model distance", value=l2_dist.item())
+
+        # Cosine Similarity
+        cos_sim = torch.nn.functional.cosine_similarity(prev_vect, curr_vect)
+        logger.log_scalar(task=None, iter=None, name='Cos-Sim', group=f"Model distance", value=cos_sim.item())
+
         # Test
         for u in range(t + 1):
             test_loss[t, u], acc_taw[t, u], acc_tag[t, u] = appr.eval(u, tst_loader[u])
+
+            # CKA
+            if t > 0:
+                _cka = cka(net, prev_t_net, tst_loader[u], device)
+                logger.log_scalar(task=None, iter=None, name=f't_{u}', group=f"cka", value=_cka)
+
+            # FORG
             if u < t:
                 forg_taw[t, u] = acc_taw[:t, u].max(0) - acc_taw[t, u]
                 forg_tag[t, u] = acc_tag[:t, u].max(0) - acc_tag[t, u]
@@ -394,6 +418,9 @@ def main(argv=None):
             logger.log_scalar(task=u, iter=t, name='forg_taw', group='test', value=100 * forg_taw[t, u])
             logger.log_scalar(task=u, iter=t, name='forg_tag', group='test', value=100 * forg_tag[t, u])
 
+        # save current model for next CKA calculation
+        prev_t_net = deepcopy(net)
+
         # Save
         print('Save at ' + os.path.join(args.results_path, full_exp_name))
         logger.log_result(acc_taw, name="acc_taw", step=t, skip_wandb=True)
@@ -402,7 +429,7 @@ def main(argv=None):
         logger.log_result(forg_tag, name="forg_tag", step=t, skip_wandb=True)
         if args.cm:
             logger.log_result(cm(appr.model, tst_loader[:t + 1], args.num_tasks, appr.device), name="cm", step=t,
-                              title="Task confusion matrix", xlabel="Predicted task", ylabel="True task", annot=False,
+                              title="Task confusion matrix", xlabel="Predicted task", ylabel="True task", annot=True,
                               cmap='Blues', cbar=True, vmin=0, vmax=1)
 
         logger.save_model(net.state_dict(), task=t)

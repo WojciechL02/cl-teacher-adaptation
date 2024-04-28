@@ -10,20 +10,16 @@ num_tasks=$5
 nc_first_task=$6
 network=$7
 num_epochs=$8
-lamb=$9
-wu_epochs=${10:-0}
-wu_lr=${11:-0.1}
+wu_epochs=${9:-0}
+wu_lr=${10:-0.1}
+wu_wd=${11:-0}
 lr=${12:-0.1}
-
-if [ "${dataset}" = "imagenet_subset_kaggle" ]; then
-  clip=1.0
-else
-  clip=100.0
-fi
+lamb=${13}
+stop_at_task=${14:-0}
 
 if [ ${wu_epochs} -gt 0 ]; then
-  exp_name="${tag}:lamb_${lamb}:base:wu"
-  result_path="results/${tag}/lwf_base_wu_${lamb}_${seed}"
+  exp_name="cifar100t${num_tasks}s${nc_first_task}_${tag}_wu_wd:${wu_wd}"
+  result_path="results/${tag}/ewc_wu_${seed}"
   python3 src/main_incremental.py \
     --exp-name ${exp_name} \
     --gpu ${gpu} \
@@ -33,23 +29,25 @@ if [ ${wu_epochs} -gt 0 ]; then
     --network ${network} \
     --use-test-as-val \
     --lr ${lr} \
-    --clipping ${clip} \
     --nepochs ${num_epochs} \
     --batch-size 128 \
     --seed ${seed} \
-    --cache-first-task-model \
     --log disk wandb \
     --results-path ${result_path} \
     --tags ${tag} \
-    --approach lwf \
+    --scheduler-milestones \
+    --cm \
+    --stop-at-task ${stop_at_task} \
+    --approach ewc \
     --lamb ${lamb} \
     --wu-nepochs ${wu_epochs} \
     --wu-lr ${wu_lr} \
+    --wu-wd ${wu_wd} \
     --wu-fix-bn \
     --wu-scheduler cosine
 else
-  exp_name="${tag}:lamb_${lamb}:base"
-  result_path="results/${tag}/lwf_base_${lamb}_${seed}"
+  exp_name="cifar100t${num_tasks}s${nc_first_task}_${tag}_base"
+  result_path="results/${tag}/ewc_base_${seed}"
   python3 src/main_incremental.py \
     --exp-name ${exp_name} \
     --gpu ${gpu} \
@@ -59,14 +57,15 @@ else
     --network ${network} \
     --use-test-as-val \
     --lr ${lr} \
-    --clipping ${clip} \
     --nepochs ${num_epochs} \
     --batch-size 128 \
     --seed ${seed} \
-    --cache-first-task-model \
     --log disk wandb \
     --results-path ${result_path} \
     --tags ${tag} \
-    --approach lwf \
+    --scheduler-milestones \
+    --cm \
+    --stop-at-task ${stop_at_task} \
+    --approach ewc \
     --lamb ${lamb}
 fi

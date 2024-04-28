@@ -45,8 +45,13 @@ class LLL_Net(nn.Module):
         corresponding offsets
         """
         self.heads.append(nn.Linear(self.out_size, num_outputs))
-        # weights initialization
-        if self.head_init_mode is not None:
+        # first head has the same init (zeros) in all methods
+        if len(self.heads) == 1:
+            nn.init.zeros_(self.heads[-1].weight)
+            nn.init.zeros_(self.heads[-1].bias)
+
+        # weights initialization for other heads
+        elif self.head_init_mode is not None:
             self._initialize_head_weights()
 
         # we re-compute instead of append in case an approach makes changes to the heads
@@ -122,7 +127,7 @@ class LLL_Net(nn.Module):
     def _initialize_head_weights(self):
         if self.head_init_mode == 'xavier':
             nn.init.xavier_uniform_(self.heads[-1].weight)
-            nn.init.xavier_uniform_(self.heads[-1].bias)
+            nn.init.zeros_(self.heads[-1].bias)
 
         elif self.head_init_mode == 'zeros':
             nn.init.zeros_(self.heads[-1].weight)
@@ -130,7 +135,7 @@ class LLL_Net(nn.Module):
 
         elif self.head_init_mode == 'kaiming':
             nn.init.kaiming_uniform_(self.heads[-1].weight)
-            nn.init.kaiming_uniform_(self.heads[-1].bias)
+            nn.init.zeros_(self.heads[-1].bias)
 
     def _initialize_weights(self):
         """Initialize weights using different strategies"""

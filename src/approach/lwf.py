@@ -18,7 +18,7 @@ class Appr(Inc_Learning_Appr):
     def __init__(self, model, device, nepochs=100, lr=0.05, lr_min=1e-4, lr_factor=3, lr_patience=5, clipgrad=10000,
                  momentum=0, wd=0, multi_softmax=False, wu_nepochs=0, wu_lr=1e-1, wu_fix_bn=False,
                  wu_scheduler='constant', wu_patience=None, wu_wd=0., fix_bn=False, eval_on_train=False,
-                 select_best_model_by_val_loss=True, logger=None, exemplars_dataset=None, scheduler_milestones=None,
+                 select_best_model_by_val_loss=True, logger=None, exemplars_dataset=None, scheduler_milestones=False,
                  lamb=1, T=2, mc=False, taskwise_kd=False,
                  ta=False,
                  cka=False, debug_loss=False,
@@ -212,10 +212,11 @@ class Appr(Inc_Learning_Appr):
         if self.scheduler is not None:
             self.scheduler.step()
 
-    def eval(self, t, val_loader):
+    def eval(self, t, val_loader, log_partial_loss=False):
         """Contains the evaluation code"""
         with torch.no_grad():
             total_loss, total_acc_taw, total_acc_tag, total_num = 0, 0, 0, 0
+            total_loss_kd, total_loss_ce = 0, 0
             self.model.eval()
             if self.model_old is not None:
                 self.model_old.eval()
@@ -228,10 +229,12 @@ class Appr(Inc_Learning_Appr):
                     targets_old = self.model_old(images)
                 # Forward current model
                 outputs = self.model(images)
-                loss = self.criterion(t, outputs, targets, targets_old)
+                loss, loss_kd, loss_ce = self.criterion(t, outputs, targets, targets_old, return_partial_losses=True)
                 hits_taw, hits_tag = self.calculate_metrics(outputs, targets)
                 # Log
                 total_loss += loss.data.cpu().numpy().item() * len(targets)
+                total_loss_kd += loss_kd.data.cpu().numpy().item() * len(targets)
+                total_loss_ce += loss_ce.data.cpu().numpy().item() * len(targets)
                 total_acc_taw += hits_taw.sum().data.cpu().numpy().item()
                 total_acc_tag += hits_tag.sum().data.cpu().numpy().item()
                 total_num += len(targets)
@@ -239,6 +242,12 @@ class Appr(Inc_Learning_Appr):
         if self.cka and t > 0 and self.training:
             _cka = cka(self.model, self.model_old, val_loader, self.device)
             self.logger.log_scalar(task=None, iter=None, name=f't_{t}', group=f"cka", value=_cka)
+
+        if log_partial_loss:
+            final_loss_kd = total_loss_kd / total_num
+            final_loss_ce = total_loss_ce / total_num
+            self.logger.log_scalar(task=None, iter=None, name="loss_kd", value=final_loss_kd, group="valid")
+            self.logger.log_scalar(task=None, iter=None, name="loss_ce", value=final_loss_ce, group="valid")
 
         return total_loss / total_num, total_acc_taw / total_num, total_acc_tag / total_num
 
@@ -281,7 +290,7 @@ class Appr(Inc_Learning_Appr):
             else:
                 loss_kd = self.cross_entropy(kd_outputs, kd_outputs_old, exp=1.0 / self.T)
         else:
-            loss_kd = 0
+            loss_kd = torch.zeros(1).to(self.device)
 
         # Current cross-entropy loss -- with exemplars use all heads
         if len(self.exemplars_dataset) > 0:

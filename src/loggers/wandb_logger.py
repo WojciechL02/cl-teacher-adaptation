@@ -86,6 +86,14 @@ class Logger(ExperimentLogger):
 
         wandb.log({name: _plot_to_wandb(plot)})
 
+    def log_histogram(self, group, name, task, sequence):
+        plt.cla()
+        plt.clf()
+        plt.figure(dpi=300)
+        histogram = sns.histplot(data=sequence, bins=100)
+        key = "{}_{}/t_{}".format(group, name, task)
+        wandb.log({key: _plot_to_wandb(histogram)})
+
     def log_figure(self, name, iter, figure, curtime=None):
         wandb.log({name: _plot_to_wandb(figure)})
 
