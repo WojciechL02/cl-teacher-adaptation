@@ -27,7 +27,7 @@ class Appr(Inc_Learning_Appr):
         self.hinge_loss = torch.nn.MultiMarginLoss()
         self.lamb = lamb
         self.cka = cka
-        self.debug_loss = debug_loss
+        self.debug_loss = True
 
     @staticmethod
     def exemplars_dataset_class():
@@ -50,20 +50,19 @@ class Appr(Inc_Learning_Appr):
     def train_loop(self, t, trn_loader, val_loader):
         """Contains the epochs loop"""
 
-        # add exemplars to train_loader
-        # if len(self.exemplars_dataset) > 0 and t > 0:
-        #     trn_loader = torch.utils.data.DataLoader(trn_loader.dataset + self.exemplars_dataset,
-        #                                              batch_size=trn_loader.batch_size,
-        #                                              shuffle=True,
-        #                                              num_workers=trn_loader.num_workers,
-        #                                              pin_memory=trn_loader.pin_memory)
-
         self.training = True
         # FINETUNING TRAINING -- contains the epochs loop
         super().train_loop(t, trn_loader, val_loader)
         self.training = False
 
         # EXEMPLAR MANAGEMENT -- select training subset
+        # add exemplars to train_loader but after training (only for Hinge Loss method)
+        if len(self.exemplars_dataset) > 0 and t > 0:
+            trn_loader = torch.utils.data.DataLoader(trn_loader.dataset + self.exemplars_dataset,
+                                                     batch_size=trn_loader.batch_size,
+                                                     shuffle=True,
+                                                     num_workers=trn_loader.num_workers,
+                                                     pin_memory=trn_loader.pin_memory)
         self.exemplars_dataset.collect_exemplars(self.model, trn_loader, val_loader.dataset.transform)
 
     def train_epoch(self, t, trn_loader):
@@ -72,11 +71,12 @@ class Appr(Inc_Learning_Appr):
         if self.fix_bn and t > 0:
             self.model.freeze_bn()
 
-        exemplars_loader = iter(torch.utils.data.DataLoader(self.exemplars_dataset,
-                                                     batch_size=trn_loader.batch_size,
+        if t > 0:
+            exemplars_loader = iter(torch.utils.data.DataLoader(self.exemplars_dataset,
+                                                     batch_size=43,
                                                      shuffle=True,
                                                      num_workers=trn_loader.num_workers,
-                                                     pin_memory=trn_loader.pin_memory))
+                                                     pin_memory=False))
 
         for images, targets in trn_loader:
             images = images.to(self.device, non_blocking=True)
@@ -84,17 +84,22 @@ class Appr(Inc_Learning_Appr):
 
             outputs_new = self.model(images)
 
-            exemplars, targets_exemplars = next(exemplars_loader)
-            exemplars = torch.cat([images, exemplars.to(self.device, non_blocking=True)], dim=0)
-            targets_exemplars = torch.cat([targets_new, targets_exemplars.to(self.device, non_blocking=True)], dim=0)
+            if t > 0:
+                exemplars, targets_exemplars = next(exemplars_loader)
 
-            outputs_old = self.model(exemplars)
-            loss, loss_margin, loss_ce = self.criterion(t, outputs_new, targets_new, outputs_old, targets_exemplars, return_partial_losses=True)
+                exemplars = torch.cat([images[:43], exemplars.to(self.device, non_blocking=True)], dim=0)
+                targets_exemplars = torch.cat([targets_new[:43], targets_exemplars.to(self.device, non_blocking=True)], dim=0)
+
+                outputs_old = self.model(exemplars)
+                loss, loss_margin, loss_ce = self.criterion(t, outputs_new, targets_new, outputs_old, targets_exemplars, return_partial_losses=True)
+            else:
+                loss, _, loss_ce = self.criterion(t, outputs_new, targets_new, return_partial_losses=True)
             if self.debug_loss:
-                self.logger.log_scalar(task=None, iter=None, name='loss_margin', group=f"debug_t{t}",
-                                       value=float(loss_margin))
-                self.logger.log_scalar(task=None, iter=None, name='loss_ce', group=f"debug_t{t}",
-                                       value=float(loss_ce))
+                if t > 0:
+                    self.logger.log_scalar(task=None, iter=None, name='loss_margin', group=f"debug_t{t}",
+                                        value=float(loss_margin))
+                    self.logger.log_scalar(task=None, iter=None, name='loss_ce', group=f"debug_t{t}",
+                                        value=float(loss_ce))
                 self.logger.log_scalar(task=None, iter=None, name='loss_total', group=f"debug_t{t}",
                                        value=float(loss))
 
@@ -143,7 +148,8 @@ class Appr(Inc_Learning_Appr):
         """Returns the loss value"""
         # Hinge Loss
         if t > 0 and outputs_old is not None:
-            hinge_loss = self.hinge_loss(torch.cat(outputs_old, dim=1), targets_old)
+            x = torch.cat(outputs_old, dim=1)
+            hinge_loss = self.hinge_loss(x, targets_old)
         else:
             hinge_loss = torch.zeros(1).to(self.device)
 

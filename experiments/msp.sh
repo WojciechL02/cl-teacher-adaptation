@@ -16,8 +16,8 @@ dataset=cifar100_icarl
 num_tasks=10
 nc_first_task=10
 network=resnet32
-num_epochs=10
-lamb=1
+num_epochs=20
+lamb=5
 lr=0.1
 head_init=zeros
 stop_at_task=2
@@ -43,4 +43,5 @@ python3 src/main_incremental.py \
   --approach msp \
   --stop-at-task ${stop_at_task} \
   --lamb ${lamb} \
-  --head-init-mode ${head_init}
+  --head-init-mode ${head_init} \
+  --num-exemplars 2000
