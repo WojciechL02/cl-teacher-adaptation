@@ -18,14 +18,13 @@ class Appr(Inc_Learning_Appr):
                  momentum=0, wd=0, multi_softmax=False, wu_nepochs=0, wu_lr=1e-1, wu_fix_bn=False,
                  wu_scheduler='constant', wu_patience=None, wu_wd=0., fix_bn=False, eval_on_train=False,
                  select_best_model_by_val_loss=True, logger=None, exemplars_dataset=None, scheduler_milestones=False,
-                 lamb=1, cka=False, debug_loss=False
+                 cka=False, debug_loss=False
                  ):
         super(Appr, self).__init__(model, device, nepochs, lr, lr_min, lr_factor, lr_patience, clipgrad, momentum, wd,
                                    multi_softmax, wu_nepochs, wu_lr, wu_fix_bn, wu_scheduler, wu_patience, wu_wd,
                                    fix_bn, eval_on_train, select_best_model_by_val_loss, logger, exemplars_dataset,
                                    scheduler_milestones)
         self.hinge_loss = torch.nn.MultiMarginLoss()
-        self.lamb = lamb
         self.cka = cka
         self.debug_loss = True
 
@@ -37,8 +36,6 @@ class Appr(Inc_Learning_Appr):
     def extra_parser(args):
         """Returns a parser containing the approach specific parameters"""
         parser = ArgumentParser()
-        parser.add_argument('--lamb', default=1, type=float, required=False,
-                            help='Hinge Loss balance (default=%(default)s)')
         parser.add_argument('--cka', default=False, action='store_true', required=False,
                             help='If set, will compute CKA between current representations and representations at '
                                  'the start of the task. (default=%(default)s)')
@@ -77,13 +74,8 @@ class Appr(Inc_Learning_Appr):
             targets = targets.to(self.device, non_blocking=True)
 
             outputs = self.model(images)
-            loss, loss_margin, loss_ce = self.criterion(t, outputs, targets, return_partial_losses=True)
+            loss = self.criterion(t, outputs, targets, return_partial_losses=True)
             if self.debug_loss:
-                if t > 0:
-                    self.logger.log_scalar(task=None, iter=None, name='loss_margin', group=f"debug_t{t}",
-                                        value=float(loss_margin.item()))
-                    self.logger.log_scalar(task=None, iter=None, name='loss_ce', group=f"debug_t{t}",
-                                        value=float(loss_ce.item()))
                 self.logger.log_scalar(task=None, iter=None, name='loss_total', group=f"debug_t{t}",
                                        value=float(loss.item()))
 
@@ -102,18 +94,16 @@ class Appr(Inc_Learning_Appr):
         """Contains the evaluation code"""
         with torch.no_grad():
             total_loss, total_acc_taw, total_acc_tag, total_num = 0, 0, 0, 0
-            total_loss_ce = 0
             self.model.eval()
 
             for images, targets in val_loader:
                 images, targets = images.to(self.device), targets.to(self.device)
 
                 outputs = self.model(images)
-                loss, _, loss_ce = self.criterion(t, outputs, targets, return_partial_losses=True)
+                loss = self.criterion(t, outputs, targets, return_partial_losses=True)
                 hits_taw, hits_tag = self.calculate_metrics(outputs, targets)
                 # Log
                 total_loss += loss.data.cpu().numpy().item() * len(targets)
-                total_loss_ce += loss_ce.data.cpu().numpy().item() * len(targets)
                 total_acc_taw += hits_taw.sum().data.cpu().numpy().item()
                 total_acc_tag += hits_tag.sum().data.cpu().numpy().item()
                 total_num += len(targets)
@@ -122,24 +112,10 @@ class Appr(Inc_Learning_Appr):
             # _cka = cka(self.model, self.model_old, val_loader, self.device)
             # self.logger.log_scalar(task=None, iter=None, name=f't_{t}', group=f"cka", value=_cka)
 
-        if log_partial_loss:
-            final_loss_ce = total_loss_ce / total_num
-            self.logger.log_scalar(task=None, iter=None, name="loss_ce", value=final_loss_ce, group="valid")
-
         return total_loss / total_num, total_acc_taw / total_num, total_acc_tag / total_num
 
     def criterion(self, t, outputs, targets, return_partial_losses=False):
         """Returns the loss value"""
         # Hinge Loss
-        if t > 0:
-            hinge_loss = self.hinge_loss(torch.cat(outputs, dim=1), targets)
-        else:
-            hinge_loss = torch.zeros(1).to(self.device)
-
-        # Current cross-entropy loss
-        loss_ce = torch.nn.functional.cross_entropy(torch.cat(outputs, dim=1), targets)
-
-        if return_partial_losses:
-            return self.lamb * hinge_loss + loss_ce, hinge_loss, loss_ce
-        else:
-            return self.lamb * hinge_loss + loss_ce
+        hinge_loss = self.hinge_loss(torch.cat(outputs, dim=1), targets)
+        return hinge_loss
