@@ -16,6 +16,7 @@ dataset=cifar100_icarl
 network=resnet32
 tag=msp_test  # experiment name
 
+lamb=5
 num_epochs=100
 lr=0.1
 wu_lr=0.1
@@ -23,6 +24,6 @@ head_init=zeros
 
 # without warm-up:
 for seed in 0 1 2; do
-  ./experiments/ft2.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} 0 0 0.0 ${lr} ${head_init} ${stop_at_task} &
+  ./experiments/msp.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${lamb} ${lr} ${head_init} ${stop_at_task} &
 done
 wait
