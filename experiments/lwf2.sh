@@ -80,5 +80,6 @@ else
     --taskwise-kd \
     --stop-at-task ${stop_at_task} \
     --lamb ${lamb} \
-    --head-init-mode ${head_init}
+    --head-init-mode ${head_init} \
+    --num-exemplars 2000
 fi

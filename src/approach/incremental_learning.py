@@ -117,7 +117,8 @@ class Inc_Learning_Appr:
             best_loss = float('inf')
             best_model = self.model.state_dict()
 
-            new_trn_loader = torch.utils.data.DataLoader(trn_loader.dataset, batch_size=512, shuffle=True, num_workers=trn_loader.num_workers, pin_memory=trn_loader.pin_memory)
+            # loader with bigger batch size for more stable warmup
+            # new_trn_loader = torch.utils.data.DataLoader(trn_loader.dataset, batch_size=512, shuffle=True, num_workers=trn_loader.num_workers, pin_memory=trn_loader.pin_memory)
 
             # Loop epochs -- train warm-up head
             for e in range(self.warmup_epochs):
@@ -129,7 +130,7 @@ class Inc_Learning_Appr:
                     self.model.train()
                 self.model.heads[-1].train()
 
-                for images, targets in new_trn_loader:
+                for images, targets in trn_loader:
                     images = images.to(self.device, non_blocking=True)
                     targets = targets.to(self.device, non_blocking=True)
 
@@ -145,7 +146,7 @@ class Inc_Learning_Appr:
                 with torch.no_grad():
                     total_loss, total_acc_taw = 0, 0
                     self.model.eval()
-                    for images, targets in new_trn_loader:
+                    for images, targets in trn_loader:
                         images, targets = images.to(self.device), targets.to(self.device)
                         outputs = self.model(images)
                         loss = self.warmup_loss(outputs[t], targets - self.model.task_offset[t])
@@ -156,7 +157,7 @@ class Inc_Learning_Appr:
                         hits_taw = (pred == targets).float()
                         total_loss += loss.item() * len(targets)
                         total_acc_taw += hits_taw.sum().item()
-                total_num = len(new_trn_loader.dataset.labels)
+                total_num = len(trn_loader.dataset.labels)
                 trn_loss, trn_acc = total_loss / total_num, total_acc_taw / total_num
                 warmupclock2 = time.time()
                 print('| Warm-up Epoch {:3d}, time={:5.1f}s/{:5.1f}s | Train: loss={:.3f}, TAw acc={:5.1f}% |'.format(
