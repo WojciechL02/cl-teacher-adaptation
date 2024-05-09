@@ -17,13 +17,12 @@ num_tasks=$5
 nc_first_task=$6
 network=$7
 num_epochs=$8
-lamb=$9
-lr=${10:-0.1}
-head_init=${11}
-stop_at_task=${12:-0}
+lr=${9:-0.1}
+head_init=${10}
+stop_at_task=${11:-0}
 
-exp_name="cifar100t${num_tasks}s${nc_first_task}_${tag}_hz_lamb:${lamb}t0hl"
-result_path="results/${tag}/msp_hz_${lamb}_${seed}"
+exp_name="cifar100t${num_tasks}s${nc_first_task}_${tag}_hz"
+result_path="results/${tag}/msphl_hz_${seed}"
 python3 src/main_incremental.py \
   --exp-name ${exp_name} \
   --gpu ${gpu} \
@@ -40,8 +39,7 @@ python3 src/main_incremental.py \
   --results-path ${result_path} \
   --tags ${tag} \
   --scheduler-milestones \
-  --approach msp \
-  --lamb ${lamb} \
+  --approach msphl \
   --stop-at-task ${stop_at_task} \
   --head-init-mode ${head_init} \
   --num-exemplars 2000
