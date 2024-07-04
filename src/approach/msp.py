@@ -24,7 +24,6 @@ class Appr(Inc_Learning_Appr):
                                    multi_softmax, wu_nepochs, wu_lr, wu_fix_bn, wu_scheduler, wu_patience, wu_wd,
                                    fix_bn, eval_on_train, select_best_model_by_val_loss, logger, exemplars_dataset,
                                    scheduler_milestones)
-        self.hinge_loss = torch.nn.MultiMarginLoss()
         self.lamb = lamb
         self.cka = cka
         self.debug_loss = True
@@ -103,16 +102,18 @@ class Appr(Inc_Learning_Appr):
         with torch.no_grad():
             total_loss, total_acc_taw, total_acc_tag, total_num = 0, 0, 0, 0
             total_loss_ce = 0
+            total_loss_margin = 0
             self.model.eval()
 
             for images, targets in val_loader:
                 images, targets = images.to(self.device), targets.to(self.device)
 
                 outputs = self.model(images)
-                loss, _, loss_ce = self.criterion(t, outputs, targets, return_partial_losses=True)
+                loss, loss_margin, loss_ce = self.criterion(t, outputs, targets, return_partial_losses=True)
                 hits_taw, hits_tag = self.calculate_metrics(outputs, targets)
                 # Log
                 total_loss += loss.data.cpu().numpy().item() * len(targets)
+                total_loss_margin += loss_margin.data.cpu().numpy().item() * len(targets)
                 total_loss_ce += loss_ce.data.cpu().numpy().item() * len(targets)
                 total_acc_taw += hits_taw.sum().data.cpu().numpy().item()
                 total_acc_tag += hits_tag.sum().data.cpu().numpy().item()
@@ -123,8 +124,10 @@ class Appr(Inc_Learning_Appr):
             # self.logger.log_scalar(task=None, iter=None, name=f't_{t}', group=f"cka", value=_cka)
 
         if log_partial_loss:
+            final_loss_margin = total_loss_margin / total_num
             final_loss_ce = total_loss_ce / total_num
             self.logger.log_scalar(task=None, iter=None, name="loss_ce", value=final_loss_ce, group="valid")
+            self.logger.log_scalar(task=None, iter=None, name="loss_margin", value=final_loss_margin, group="valid")
 
         return total_loss / total_num, total_acc_taw / total_num, total_acc_tag / total_num
 
@@ -132,7 +135,7 @@ class Appr(Inc_Learning_Appr):
         """Returns the loss value"""
         # Hinge Loss
         if t > 0:
-            hinge_loss = self.hinge_loss(torch.cat(outputs, dim=1), targets)
+            hinge_loss = torch.nn.functional.multi_margin_loss(torch.cat(outputs, dim=1), targets)
         else:
             hinge_loss = torch.zeros(1).to(self.device)
 

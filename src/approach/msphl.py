@@ -24,7 +24,6 @@ class Appr(Inc_Learning_Appr):
                                    multi_softmax, wu_nepochs, wu_lr, wu_fix_bn, wu_scheduler, wu_patience, wu_wd,
                                    fix_bn, eval_on_train, select_best_model_by_val_loss, logger, exemplars_dataset,
                                    scheduler_milestones)
-        self.hinge_loss = torch.nn.MultiMarginLoss()
         self.cka = cka
         self.debug_loss = True
 
@@ -117,5 +116,5 @@ class Appr(Inc_Learning_Appr):
     def criterion(self, t, outputs, targets, return_partial_losses=False):
         """Returns the loss value"""
         # Hinge Loss
-        hinge_loss = self.hinge_loss(torch.cat(outputs, dim=1), targets)
+        hinge_loss = torch.nn.functional.multi_margin_loss(torch.cat(outputs, dim=1), targets)
         return hinge_loss
