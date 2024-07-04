@@ -29,6 +29,9 @@ class ExperimentLogger:
 
     def log_histogram(self, group, name, task, sequence):
         pass
+    
+    def log_latent_vis(self, group, task, epoch, data):
+        pass
 
     def save_model(self, state_dict, task):
         pass
@@ -93,6 +96,10 @@ class MultiLogger(ExperimentLogger):
     def log_histogram(self, group, name, task, sequence):
         for l in self.loggers:
             l.log_histogram(group, name, task, sequence)
+    
+    def log_latent_vis(self, group, task, epoch, data):
+        for l in self.loggers:
+            l.log_latent_vis(group, task, epoch, data)
 
     def save_model(self, state_dict, task):
         if self.save_models:

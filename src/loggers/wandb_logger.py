@@ -93,6 +93,22 @@ class Logger(ExperimentLogger):
         histogram = sns.histplot(data=sequence, bins=100)
         key = "{}_{}/t_{}".format(group, name, task)
         wandb.log({key: _plot_to_wandb(histogram)})
+    
+    def log_latent_vis(self, group, task, epoch, data):
+        plt.cla()
+        plt.clf()
+        plt.figure(dpi=300)
+        vis = sns.scatterplot(
+                        x=0, y=1,
+                        hue="label",
+                        palette=sns.color_palette("hls", data["label"].nunique()),
+                        data=data,
+                        legend="full",
+                        alpha=0.9
+                    )
+        vis.set_title(f"t_{task}_e_{epoch}")
+        key = "{}/t_{}_e_{}".format(group, task, epoch)
+        wandb.log({key: _plot_to_wandb(vis)})
 
     def log_figure(self, name, iter, figure, curtime=None):
         wandb.log({name: _plot_to_wandb(figure)})

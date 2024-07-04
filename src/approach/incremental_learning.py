@@ -3,6 +3,8 @@ from copy import deepcopy
 import torch
 import numpy as np
 from argparse import ArgumentParser
+import umap
+import pandas as pd
 
 from loggers.exp_logger import ExperimentLogger
 from datasets.exemplars_dataset import ExemplarsDataset
@@ -15,7 +17,7 @@ class Inc_Learning_Appr:
                  momentum=0, wd=0, multi_softmax=False, wu_nepochs=0, wu_lr=1e-1, wu_fix_bn=False,
                  wu_scheduler='constant', wu_patience=None, wu_wd=0., fix_bn=False,
                  eval_on_train=False, select_best_model_by_val_loss=True, logger: ExperimentLogger = None,
-                 exemplars_dataset: ExemplarsDataset = None, scheduler_milestones=False, no_learning=False):
+                 exemplars_dataset: ExemplarsDataset = None, scheduler_milestones=False, no_learning=False, log_grad_norm=True):
         self.model = model
         self.device = device
         self.nepochs = nepochs
@@ -46,6 +48,8 @@ class Inc_Learning_Appr:
         self.no_learning = no_learning
 
         self.last_e_accs = None # variable for stability-gap metric
+        self.log_grad_norm = True
+        self.projector = None # UMAP
 
     @staticmethod
     def extra_parser(args):
@@ -70,6 +74,30 @@ class Inc_Learning_Appr:
             return torch.optim.lr_scheduler.LinearLR(optimizer=self.optimizer, start_factor=1.0, end_factor=0.01, total_iters=self.nepochs)
         else:
             return None
+    
+    def get_embeddings(self, t):
+        loaders = self.tst_loader[:t + 1]
+        self.model.eval()
+        labels = []
+        embed_list = []
+        with torch.no_grad():
+            for i, loader in enumerate(loaders):
+                for images, targets in loader:
+                    images, targets = images.to(self.device), targets.to(self.device)
+                    outputs = self.model.model(images)  # get only backbone results
+                    embed_list.append(outputs)
+                    labels.append(targets)
+        return torch.cat(embed_list, dim=0), torch.cat(labels, dim=0)
+    
+    def project_latent_space(self, embeddings, labels):
+        if self.projector is None:
+            self.projector = umap.UMAP(metric="euclidean", n_neighbors=50)
+            projected = self.projector.fit_transform(embeddings.cpu())
+        else:
+            projected = self.projector.transform(embeddings.cpu())
+        data = pd.DataFrame(projected)
+        data["label"] = labels.cpu()
+        return data
 
     def train(self, t, trn_loader, val_loader):
         """Main train structure"""
@@ -430,6 +458,13 @@ class Inc_Learning_Appr:
             self.logger.log_scalar(task=t, iter=e + 1, name="lr", value=lr, group="train")
             print()
 
+            # ======== LATENT SPACE ANALYSIS =========
+            # if ((t == 0 and e == self.nepochs - 1) or (t > 0 and e in (0, self.nepochs // 2, self.nepochs - 1))):
+            #     embeddings, labels = self.get_embeddings(t)
+            #     data_vis = self.project_latent_space(embeddings, labels)
+            #     self.logger.log_latent_vis(group="Latent_Vis", task=t, epoch=e, data=data_vis)
+            # ========================================
+
         self.model.set_state_dict(best_model)
 
         # MEASURE LAST HEAD DISTANCE/SIMILARITY
@@ -449,7 +484,7 @@ class Inc_Learning_Appr:
             final_clf_l2 = torch.linalg.vector_norm(head_curr_vect, 2)
             self.logger.log_scalar(task=None, iter=None, name='clf L2', group=f"Last head", value=final_clf_l2.item())
 
-            self._log_heads_activation_statistics(t)
+            # self._log_heads_activation_statistics(t)
 
     def _log_heads_activation_statistics(self, t):
         self.model.eval()
@@ -476,6 +511,15 @@ class Inc_Learning_Appr:
                 final_max = act_maxs.max()
                 self.logger.log_scalar(task=task_id, iter=None, name='Max', group='Head activations', value=final_max.item())
 
+    def _calc_backbone_grad_norm(self):
+        total_norm = 0
+        for p in self.model.model.parameters():
+            if p.grad is not None:
+                param_norm = p.grad.data.norm(2)
+                total_norm += param_norm.item() ** 2
+        total_norm = total_norm ** 0.5
+        return total_norm
+
     def post_train_process(self, t, trn_loader):
         """Runs after training all the epochs of the task (after the train session)"""
         pass
@@ -493,8 +537,15 @@ class Inc_Learning_Appr:
             if t == 0 or not self.no_learning:
                 self.optimizer.zero_grad()
                 loss.backward()
+                # ======== LOG GRADIENT NORM ========
+                if self.log_grad_norm:
+                    total_norm = self._calc_backbone_grad_norm()
+                    self.logger.log_scalar(task=t, iter=None, name="Backbone", value=total_norm, group="Grad_Norm")
+                # ===================================
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.clipgrad)
+
             self.optimizer.step()
+
         if self.scheduler is not None:
             self.scheduler.step()
 
@@ -536,6 +587,7 @@ class Inc_Learning_Appr:
             pred = torch.cat(outputs, dim=1).argmax(1)
         hits_tag = (pred == targets).float()
         return hits_taw, hits_tag
+        
     def criterion(self, t, outputs, targets):
         """Returns the loss value"""
         return torch.nn.functional.cross_entropy(outputs[t], targets - self.model.task_offset[t])
