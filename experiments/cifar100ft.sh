@@ -11,10 +11,10 @@ conda activate FACIL
 
 num_tasks=10
 nc_first_task=10
-stop_at_task=2  # default = 0
+stop_at_task=0  # default = 0
 dataset=cifar100_icarl
 network=resnet32
-tag=msp_test  # experiment name
+tag=msp_test_t10  # experiment name
 
 num_epochs=100
 lr=0.1

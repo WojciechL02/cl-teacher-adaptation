@@ -14,18 +14,15 @@ nc_first_task=10
 stop_at_task=0  # default = 0
 dataset=cifar100_icarl
 network=resnet32
-tag=msp_test_t10  # experiment name
+tag=nmc3_num_exemp_per_C_t10  # experiment name
 
-# lamb=5
 num_epochs=100
 lr=0.1
-wu_lr=0.1
 head_init=zeros
 
 # without warm-up:
-for lamb in 1 2 3; do
-  for seed in 0 1 2; do
-    ./experiments/msp.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${lamb} ${lr} ${head_init} ${stop_at_task} &
-  done
-  wait
+exemplars=50
+for seed in 0 1 2; do
+  ./experiments/ft_nmc.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${lr} ${head_init} ${stop_at_task} 0 ${exemplars} &
 done
+wait

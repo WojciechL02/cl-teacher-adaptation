@@ -21,7 +21,7 @@ lr=${9:-0.1}
 head_init=${10}
 stop_at_task=${11:-0}
 
-exp_name="cifar100t${num_tasks}s${nc_first_task}_${tag}_hz"
+exp_name="cifar100t${num_tasks}s${nc_first_task}_${tag}_hz_lr${lr}"
 result_path="results/${tag}/msphl_hz_${seed}"
 python3 src/main_incremental.py \
   --exp-name ${exp_name} \

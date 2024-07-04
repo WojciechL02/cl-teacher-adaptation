@@ -10,18 +10,18 @@ num_tasks=$5
 nc_first_task=$6
 network=$7
 num_epochs=$8
-wu_epochs=${9:-0}
-wu_lr=${10:-0.1}
-wu_wd=${11:-0.0}
-lr=${12:-0.1}
-head_init=${13}
-stop_at_task=${14:-0}
-exemplars=${15:-20}
+lr=${9:-0.1}
+head_init=${10}
+stop_at_task=${11:-0}
+update_prototypes=${12:-0}
+exemplars=${13:-20}
+temperature=${14:-0.1}
 
-if [ ${wu_epochs} -gt 0 ]; then
-  exp_name="t${num_tasks}s${nc_first_task}_wu_hz_wd:${wu_wd}_m:${exemplars}"
-  result_path="results/${tag}/ft_wu_hz_${seed}"
-  python3 src/main_incremental.py \
+
+if [ ${update_prototypes} -gt 0 ]; then
+    exp_name="t${num_tasks}s${nc_first_task}_hz_m:${exemplars}_up:${update_prototypes}"
+    result_path="results/${tag}/supcon_hz_${seed}"
+    python3 src/main_incremental.py \
     --exp-name ${exp_name} \
     --gpu ${gpu} \
     --datasets ${dataset} \
@@ -30,27 +30,23 @@ if [ ${wu_epochs} -gt 0 ]; then
     --network ${network} \
     --use-test-as-val \
     --lr ${lr} \
-    --wu-wd ${wu_wd} \
     --nepochs ${num_epochs} \
-    --batch-size 128 \
+    --batch-size 512 \
     --seed ${seed} \
     --log disk wandb \
     --results-path ${result_path} \
     --tags ${tag} \
-    --cm \
-    --stop-at-task ${stop_at_task} \
-    --approach finetuning \
     --scheduler-milestones \
+    --stop-at-task ${stop_at_task} \
+    --approach supcon \
+    --temperature ${temperature} \
     --num-exemplars-per-class ${exemplars} \
-    --wu-nepochs ${wu_epochs} \
-    --wu-lr ${wu_lr} \
-    --wu-fix-bn \
-    --wu-scheduler cosine \
-    --head-init-mode ${head_init}
+    --head-init-mode ${head_init} \
+    --update_prototypes
 else
-  exp_name="t${num_tasks}s${nc_first_task}_hz_m:${exemplars}"
-  result_path="results/${tag}/ft_hz_${seed}"
-  python3 src/main_incremental.py \
+    exp_name="t${num_tasks}s${nc_first_task}_hz_m:${exemplars}_up:${update_prototypes}"
+    result_path="results/${tag}/supcon_hz_${seed}"
+    python3 src/main_incremental.py \
     --exp-name ${exp_name} \
     --gpu ${gpu} \
     --datasets ${dataset} \
@@ -59,17 +55,16 @@ else
     --network ${network} \
     --use-test-as-val \
     --lr ${lr} \
-    --wu-wd ${wu_wd} \
     --nepochs ${num_epochs} \
-    --batch-size 128 \
+    --batch-size 512 \
     --seed ${seed} \
     --log disk wandb \
     --results-path ${result_path} \
     --tags ${tag} \
     --scheduler-milestones \
-    --cm \
     --stop-at-task ${stop_at_task} \
-    --approach finetuning \
+    --approach supcon \
+    --temperature ${temperature} \
     --num-exemplars-per-class ${exemplars} \
     --head-init-mode ${head_init}
 fi

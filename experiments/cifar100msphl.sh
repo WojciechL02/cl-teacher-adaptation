@@ -17,7 +17,7 @@ network=resnet32
 tag=msp_test  # experiment name
 
 num_epochs=100
-lr=0.1
+lr=2.0
 wu_lr=0.1
 head_init=zeros
 
