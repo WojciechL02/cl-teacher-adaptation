@@ -11,13 +11,13 @@ conda activate FACIL
 
 num_tasks=10
 nc_first_task=10
-stop_at_task=1  # default = 0
+stop_at_task=2  # default = 0
 dataset=cifar100_icarl
-network=resnet18
+network=resnet32
 tag=nmc3_num_exemp_per_C  # experiment name
 
 num_epochs=100
-lr=0.01
+lr=0.05
 head_init=zeros
 
 # without warm-up:

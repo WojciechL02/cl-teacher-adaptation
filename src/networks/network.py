@@ -79,7 +79,9 @@ class LLL_Net(nn.Module):
         assert (len(self.heads) > 0), "Cannot access any head"
         
         if self.ssl_projector is not None:
+            x = torch.nn.functional.normalize(x, dim=1)
             y = self.ssl_projector(x)
+            y = torch.nn.functional.normalize(y, dim=1)
         else:
             y = []
             for head in self.heads:
