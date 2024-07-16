@@ -143,17 +143,18 @@ class Appr(Inc_Learning_Appr):
         if self.scheduler is not None:
             self.scheduler.step()
         
+        # MEANS UPDATE
+        # compute mean of exemplars on every epoch
+        old_classes_prototypes = self.exemplar_means[:self.model.task_offset[t]]
+        self.exemplar_means = []
         if t > 0:
-            # compute mean of exemplars on every epoch
-            old_classes_prototypes = self.exemplar_means[:self.model.task_offset[t]]
-            self.exemplar_means = []
             if self.update_prototypes:
                 # update old classes prototypes
                 self.compute_mean_of_exemplars(trn_loader, self.val_loader_transform)
             else:
                 # leave prototypes of old classes unchanged
                 self.exemplar_means.extend(old_classes_prototypes)
-            self.compute_means_of_current_classes(trn_loader)
+        self.compute_means_of_current_classes(trn_loader)
 
     # Algorithm 2: iCaRL Incremental Train
     def train_loop(self, t, trn_loader, val_loader):
@@ -172,14 +173,14 @@ class Appr(Inc_Learning_Appr):
         # FINETUNING TRAINING -- contains the epochs loop
         super().train_loop(t, trn_loader, val_loader)
 
-        # EXEMPLAR MANAGEMENT -- select training subset
-        # Algorithm 4: iCaRL ConstructExemplarSet and Algorithm 5: iCaRL ReduceExemplarSet
-        self.val_loader_transform = val_loader.dataset.transform
-        self.exemplars_dataset.collect_exemplars(self.model, trn_loader, val_loader.dataset.transform)
-
-        # compute mean of exemplars
+        # compute new prototypes
         self.exemplar_means = []
         self.compute_mean_of_exemplars(trn_loader, val_loader.dataset.transform)
+        self.compute_means_of_current_classes(trn_loader)
+
+        # select exemplars
+        self.val_loader_transform = val_loader.dataset.transform
+        self.exemplars_dataset.collect_exemplars(self.model, trn_loader, val_loader.dataset.transform)
 
     def eval(self, t, val_loader, log_partial_loss=False):
         """Contains the evaluation code"""

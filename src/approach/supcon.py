@@ -58,7 +58,7 @@ class SupConLoss(torch.nn.Module):
         else:
             mask = mask.float().to(device)
 
-        contrast_count = features.shape[1].long()
+        contrast_count = features.shape[1]
         contrast_feature = torch.cat(torch.unbind(features, dim=1), dim=0)
         if self.contrast_mode == 'one':
             anchor_feature = features[:, 0]
@@ -129,12 +129,11 @@ class Appr(Inc_Learning_Appr):
 
         color_jitter = transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
         self.trn_transforms = transforms.Compose([
-            transforms.Pad(4),
-            transforms.RandomResizedCrop(32),
+            transforms.RandomResizedCrop(size=32, scale=(0.2, 1.)),
             transforms.RandomHorizontalFlip(),
-            # transforms.Normalize((0.5071, 0.4866, 0.4409), (0.2009, 0.1984, 0.2023)),
             transforms.RandomApply([color_jitter], p=0.8),
             transforms.RandomGrayscale(p=0.2),
+            transforms.Normalize((0.5071, 0.4866, 0.4409), (0.2009, 0.1984, 0.2023)),
         ])
 
         self.val_loader_transform = None
@@ -216,13 +215,19 @@ class Appr(Inc_Learning_Appr):
                 self.exemplar_means.append(cls_feats_mean)
     
     def compute_means_of_current_classes(self, trn_loader):
-        loader = deepcopy(trn_loader)
+        dataset = trn_loader.dataset
+        dataset.transform = self.val_loader_transform
+        loader = torch.utils.data.DataLoader(dataset,
+                                            batch_size=trn_loader.batch_size,
+                                            shuffle=True,
+                                            num_workers=trn_loader.num_workers,
+                                            pin_memory=trn_loader.pin_memory)
         extracted_features = []
         extracted_targets = []
         with torch.no_grad():
             self.model.eval()
             for images, targets in loader:
-                feats = self.model(images.to(self.device), return_features=True)[1]
+                _, feats = self.model(images.to(self.device), return_features=True)
                 # normalize
                 extracted_features.append(feats / feats.norm(dim=1).view(-1, 1))
                 extracted_targets.extend(targets)
@@ -249,30 +254,37 @@ class Appr(Inc_Learning_Appr):
             images, targets = images.to(self.device), targets.to(self.device)
             images1 = self.trn_transforms(images)
             images2 = self.trn_transforms(images)
-            y1 = self.model(images1)
-            y2 = self.model(images2)
-            y = torch.cat([y1.unsqueeze(1), y2.unsqueeze(1)], dim=1)
+
+            imgs = torch.cat([images1, images2], dim=0)
+            features = self.model(imgs)
+            batch_size = images.shape[0]
+            f1, f2 = torch.split(features, [batch_size, batch_size], dim=0)
+            y = torch.cat([f1.unsqueeze(1), f2.unsqueeze(1)], dim=1)
+
             loss = self.criterion(t, y, targets)
+            self.logger.log_scalar(task=None, iter=None, name="loss", value=loss.item(), group="train")
             # Backward
             self.optimizer.zero_grad()
             loss.backward()
+
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.clipgrad)
             self.optimizer.step()
 
         if self.scheduler is not None:
             self.scheduler.step()
         
+        # MEANS UPDATE
+        # compute mean of exemplars on every epoch
+        old_classes_prototypes = self.exemplar_means[:self.model.task_offset[t]]
+        self.exemplar_means = []
         if t > 0:
-            # compute mean of exemplars on every epoch
-            old_classes_prototypes = self.exemplar_means[:self.model.task_offset[t]]
-            self.exemplar_means = []
             if self.update_prototypes:
                 # update old classes prototypes
                 self.compute_mean_of_exemplars(trn_loader, self.val_loader_transform)
             else:
                 # leave prototypes of old classes unchanged
                 self.exemplar_means.extend(old_classes_prototypes)
-            self.compute_means_of_current_classes(trn_loader)
+        self.compute_means_of_current_classes(trn_loader)
 
     # Algorithm 2: iCaRL Incremental Train
     def train_loop(self, t, trn_loader, val_loader):
@@ -285,15 +297,9 @@ class Appr(Inc_Learning_Appr):
                                                 batch_size=trn_loader.batch_size,
                                                 shuffle=True,
                                                 num_workers=trn_loader.num_workers,
-                                                pin_memory=trn_loader.pin_memory)
+                                                pin_memory=trn_loader.pin_memory,
+                                                drop_last=True)
         self.val_loader_transform = val_loader.dataset.transform
-        dataset = val_loader.dataset
-        dataset.transform = transforms.ToTensor()
-        val_loader = torch.utils.data.DataLoader(dataset,
-                                                batch_size=val_loader.batch_size,
-                                                shuffle=True,
-                                                num_workers=val_loader.num_workers,
-                                                pin_memory=val_loader.pin_memory)
         # ==============================================
 
         # Algorithm 3: iCaRL Update Representation
@@ -309,14 +315,14 @@ class Appr(Inc_Learning_Appr):
         # FINETUNING TRAINING -- contains the epochs loop
         super().train_loop(t, trn_loader, val_loader)
 
-        # EXEMPLAR MANAGEMENT -- select training subset
-        # Algorithm 4: iCaRL ConstructExemplarSet and Algorithm 5: iCaRL ReduceExemplarSet
-        self.exemplars_dataset.collect_exemplars(self.model, trn_loader, val_loader.dataset.transform)
-        self.exemplars_dataset.transform = transforms.ToTensor()
-
-        # compute mean of exemplars
+        # compute new prototypes
         self.exemplar_means = []
         self.compute_mean_of_exemplars(trn_loader, val_loader.dataset.transform)
+        self.compute_means_of_current_classes(trn_loader)
+
+        # select new exemplars
+        self.exemplars_dataset.collect_exemplars(self.model, trn_loader, val_loader.dataset.transform)
+        self.exemplars_dataset.transform = transforms.ToTensor()
 
     def eval(self, t, val_loader, log_partial_loss=False):
         """Contains the evaluation code"""
@@ -326,10 +332,8 @@ class Appr(Inc_Learning_Appr):
             for images, targets in val_loader:
                 images, targets = images.to(self.device), targets.to(self.device)
 
-                images1 = self.trn_transforms(images)
-                images2 = self.trn_transforms(images)
-                y1, feats = self.model(images1, return_features=True)
-                y2, _ = self.model(images2, return_features=True)
+                y1, feats = self.model(images, return_features=True)
+                y2, _ = self.model(images, return_features=True)
                 y = torch.cat([y1.unsqueeze(1), y2.unsqueeze(1)], dim=1)
                 loss = self.criterion(t, y, targets)
 
