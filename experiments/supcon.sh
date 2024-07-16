@@ -16,6 +16,7 @@ stop_at_task=${11:-0}
 update_prototypes=${12:-0}
 exemplars=${13:-20}
 temperature=${14:-0.1}
+batch_size=${15:-128}
 
 
 if [ ${update_prototypes} -gt 0 ]; then
@@ -31,7 +32,7 @@ if [ ${update_prototypes} -gt 0 ]; then
     --use-test-as-val \
     --lr ${lr} \
     --nepochs ${num_epochs} \
-    --batch-size 512 \
+    --batch-size ${batch_size} \
     --seed ${seed} \
     --log disk wandb \
     --results-path ${result_path} \
@@ -56,7 +57,7 @@ else
     --use-test-as-val \
     --lr ${lr} \
     --nepochs ${num_epochs} \
-    --batch-size 512 \
+    --batch-size ${batch_size} \
     --seed ${seed} \
     --log disk wandb \
     --results-path ${result_path} \
