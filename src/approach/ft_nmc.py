@@ -175,7 +175,8 @@ class Appr(Inc_Learning_Appr):
 
         # compute new prototypes
         self.exemplar_means = []
-        self.compute_mean_of_exemplars(trn_loader, val_loader.dataset.transform)
+        if t > 0:
+            self.compute_mean_of_exemplars(trn_loader, val_loader.dataset.transform)
         self.compute_means_of_current_classes(trn_loader)
 
         # select exemplars

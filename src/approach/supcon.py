@@ -304,7 +304,7 @@ class Appr(Inc_Learning_Appr):
 
         # Algorithm 3: iCaRL Update Representation
         # Alg. 3. "form combined training set", add exemplars to train_loader
-        self.compute_means_of_current_classes(trn_loader)
+        self.compute_means_of_current_classes(trn_loader)        
         if t > 0:
             trn_loader = torch.utils.data.DataLoader(trn_loader.dataset + self.exemplars_dataset,
                                                      batch_size=trn_loader.batch_size,
@@ -317,7 +317,8 @@ class Appr(Inc_Learning_Appr):
 
         # compute new prototypes
         self.exemplar_means = []
-        self.compute_mean_of_exemplars(trn_loader, val_loader.dataset.transform)
+        if t > 0:
+            self.compute_mean_of_exemplars(trn_loader, val_loader.dataset.transform)
         self.compute_means_of_current_classes(trn_loader)
 
         # select new exemplars
