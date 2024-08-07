@@ -41,14 +41,15 @@ if [ ${wu_epochs} -gt 0 ]; then
     --stop-at-task ${stop_at_task} \
     --approach finetuning \
     --scheduler-milestones \
-    --num-exemplars-per-class ${exemplars} \
+    --num-exemplars ${exemplars} \
     --wu-nepochs ${wu_epochs} \
     --wu-lr ${wu_lr} \
     --wu-fix-bn \
     --wu-scheduler cosine \
-    --head-init-mode ${head_init}
+    --head-init-mode ${head_init} \
+    --pretrained
 else
-  exp_name="t${num_tasks}s${nc_first_task}_hz_m:${exemplars}"
+  exp_name="t${num_tasks}s${nc_first_task}_hz_m:${exemplars}_pretr"
   result_path="results/${tag}/ft_hz_${seed}"
   python3 src/main_incremental.py \
     --exp-name ${exp_name} \
@@ -70,6 +71,7 @@ else
     --cm \
     --stop-at-task ${stop_at_task} \
     --approach finetuning \
-    --num-exemplars-per-class ${exemplars} \
-    --head-init-mode ${head_init}
+    --num-exemplars ${exemplars} \
+    --head-init-mode ${head_init} \
+    --pretrained
 fi

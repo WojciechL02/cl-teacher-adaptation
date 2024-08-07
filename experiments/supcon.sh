@@ -41,7 +41,7 @@ if [ ${update_prototypes} -gt 0 ]; then
     --stop-at-task ${stop_at_task} \
     --approach supcon \
     --temperature ${temperature} \
-    --num-exemplars-per-class ${exemplars} \
+    --num-exemplars ${exemplars} \
     --head-init-mode ${head_init} \
     --update_prototypes
 else
@@ -66,6 +66,6 @@ else
     --stop-at-task ${stop_at_task} \
     --approach supcon \
     --temperature ${temperature} \
-    --num-exemplars-per-class ${exemplars} \
+    --num-exemplars ${exemplars} \
     --head-init-mode ${head_init}
 fi

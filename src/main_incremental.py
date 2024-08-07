@@ -270,7 +270,7 @@ def main(argv=None):
 
     # Network and Approach instances
     utils.seed_everything(seed=args.seed)
-    use_ssl_projector = True if args.approach == "supcon" else False
+    use_ssl_projector = True if args.approach in ["supcon", "mixed"] else False
     net = LLL_Net(init_model, remove_existing_head=not args.keep_existing_head, head_init_mode=args.head_init_mode, use_ssl_projector=use_ssl_projector)
     utils.seed_everything(seed=args.seed)
     # taking transformations and class indices from first train dataset

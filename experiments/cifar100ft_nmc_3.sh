@@ -9,35 +9,12 @@ set -e
 eval "$(conda shell.bash hook)"
 conda activate FACIL
 
-num_tasks=10
-nc_first_task=10
-stop_at_task=5  # default = 0
-dataset=cifar100_icarl
-network=resnet32
-tag=nmc_t5  # experiment name
-
-num_epochs=100
-lr=0.1
-head_init=zeros
-
-
-#!/bin/bash
-
-#SBATCH --time=48:00:00   # walltime
-#SBATCH --ntasks=3   # number of processor cores (i.e. tasks)
-#SBATCH --gpus=1
-
-set -e
-
-eval "$(conda shell.bash hook)"
-conda activate FACIL
-
-num_tasks=10
-nc_first_task=10
+num_tasks=5
+nc_first_task=20
 stop_at_task=0  # default = 0
 dataset=cifar100_icarl
 network=resnet18
-tag=pretr  # experiment name
+tag=figure1  # experiment name
 
 num_epochs=100
 lr=0.1

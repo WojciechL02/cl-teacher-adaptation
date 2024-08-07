@@ -99,7 +99,7 @@ class SupConLoss(torch.nn.Module):
         # features of shape: [4,1,...]
         # labels:            [0,1,1,2]
         # loss before mean:  [nan, ..., ..., nan] 
-        mask_pos_pairs = mask.sum(1)
+        mask_pos_pairs = mask.sum(1).long()
         mask_pos_pairs = torch.where(mask_pos_pairs < 1e-6, 1, mask_pos_pairs)
         mean_log_prob_pos = (mask * log_prob).sum(1) / mask_pos_pairs
 
@@ -119,7 +119,7 @@ class Appr(Inc_Learning_Appr):
     def __init__(self, model, device, nepochs=60, lr=0.5, lr_min=1e-4, lr_factor=3, lr_patience=5, clipgrad=10000,
                  momentum=0.9, wd=1e-5, multi_softmax=False, wu_nepochs=0, wu_lr=0, wu_wd=0, wu_fix_bn=False, wu_lr_factor=1,
                  fix_bn=False, wu_scheduler='constant', wu_patience=None, eval_on_train=False, select_best_model_by_val_loss=True,
-                 logger=None, exemplars_dataset=None, scheduler_milestones=None, lamb=1, update_prototypes=False, temperature=0.1):
+                 logger=None, exemplars_dataset=None, scheduler_milestones=None, lamb=5, update_prototypes=False, temperature=0.1):
         super(Appr, self).__init__(model, device, nepochs, lr, lr_min, lr_factor, lr_patience, clipgrad, momentum, wd,
                                    multi_softmax, wu_nepochs, wu_lr, wu_fix_bn, wu_scheduler, wu_patience, wu_wd,
                                    fix_bn, eval_on_train, select_best_model_by_val_loss, logger, exemplars_dataset,
@@ -139,6 +139,8 @@ class Appr(Inc_Learning_Appr):
         self.val_loader_transform = None
         self.exemplar_means = []
         self.loss_func = SupConLoss(temperature)
+        self.model_old = None
+        self.printed = False
 
         # iCaRL is expected to be used with exemplars. If needed to be used without exemplars, overwrite here the
         # `_get_optimizer` function with the one in LwF and update the criterion
@@ -242,6 +244,14 @@ class Appr(Inc_Learning_Appr):
                 # add the exemplars to the set and normalize
                 cls_feats_mean = cls_feats.mean(0) / cls_feats.mean(0).norm()
                 self.exemplar_means.append(cls_feats_mean)
+    
+    def post_train_process(self, t, trn_loader):
+        """Runs after training all the epochs of the task (after the train session)"""
+
+        # Restore best and save model for future tasks
+        self.model_old = deepcopy(self.model)
+        self.model_old.eval()
+        self.model_old.freeze_all()
         
     def train_epoch(self, t, trn_loader):
         """Runs a single epoch"""
@@ -260,8 +270,12 @@ class Appr(Inc_Learning_Appr):
             batch_size = images.shape[0]
             f1, f2 = torch.split(features, [batch_size, batch_size], dim=0)
             y = torch.cat([f1.unsqueeze(1), f2.unsqueeze(1)], dim=1)
-
-            loss = self.criterion(t, y, targets)
+            if t > 0:
+                self.model_old.eval()
+                y_old = self.model_old(images1)
+                loss = self.criterion(t, y, targets, f1, y_old)
+            else:
+                loss = self.criterion(t, y, targets)
             self.logger.log_scalar(task=None, iter=None, name="loss", value=loss.item(), group="train")
             # Backward
             self.optimizer.zero_grad()
@@ -346,8 +360,13 @@ class Appr(Inc_Learning_Appr):
                 total_num += len(targets)
         return total_loss / total_num, total_acc_taw / total_num, total_acc_tag / total_num
 
-    def criterion(self, t, outputs, targets):
+    def criterion(self, t, outputs, targets, outputs_new=None, outputs_old=None):
         """Returns the loss value"""
+        if outputs_old is not None:
+            if not self.printed:
+                self.printed = True
+                print("DESTYLACJA")
+            return self.loss_func(outputs, targets) + self.lamb * torch.nn.functional.mse_loss(outputs_new, outputs_old)
         return self.loss_func(outputs, targets)
     
     def _continual_evaluation_step(self, t):

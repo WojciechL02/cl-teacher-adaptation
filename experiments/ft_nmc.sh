@@ -39,7 +39,7 @@ if [ ${update_prototypes} -gt 0 ]; then
     --cm \
     --stop-at-task ${stop_at_task} \
     --approach ft_nmc \
-    --num-exemplars-per-class ${exemplars} \
+    --num-exemplars ${exemplars} \
     --head-init-mode ${head_init} \
     --update_prototypes
 else
@@ -64,6 +64,6 @@ else
     --cm \
     --stop-at-task ${stop_at_task} \
     --approach ft_nmc \
-    --num-exemplars-per-class ${exemplars} \
+    --num-exemplars ${exemplars} \
     --head-init-mode ${head_init}
 fi
