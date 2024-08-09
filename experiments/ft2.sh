@@ -17,6 +17,7 @@ lr=${12:-0.1}
 head_init=${13}
 stop_at_task=${14:-0}
 exemplars=${15:-20}
+bsz=${16:-128}
 
 if [ ${wu_epochs} -gt 0 ]; then
   exp_name="t${num_tasks}s${nc_first_task}_wu_hz_wd:${wu_wd}_m:${exemplars}"
@@ -32,7 +33,7 @@ if [ ${wu_epochs} -gt 0 ]; then
     --lr ${lr} \
     --wu-wd ${wu_wd} \
     --nepochs ${num_epochs} \
-    --batch-size 128 \
+    --batch-size ${bsz} \
     --seed ${seed} \
     --log disk wandb \
     --results-path ${result_path} \
@@ -46,10 +47,9 @@ if [ ${wu_epochs} -gt 0 ]; then
     --wu-lr ${wu_lr} \
     --wu-fix-bn \
     --wu-scheduler cosine \
-    --head-init-mode ${head_init} \
-    --pretrained
+    --head-init-mode ${head_init}
 else
-  exp_name="t${num_tasks}s${nc_first_task}_hz_m:${exemplars}_pretr"
+  exp_name="t${num_tasks}s${nc_first_task}_hz_m:${exemplars}"
   result_path="results/${tag}/ft_hz_${seed}"
   python3 src/main_incremental.py \
     --exp-name ${exp_name} \
@@ -62,7 +62,7 @@ else
     --lr ${lr} \
     --wu-wd ${wu_wd} \
     --nepochs ${num_epochs} \
-    --batch-size 128 \
+    --batch-size ${bsz} \
     --seed ${seed} \
     --log disk wandb \
     --results-path ${result_path} \
@@ -72,6 +72,5 @@ else
     --stop-at-task ${stop_at_task} \
     --approach finetuning \
     --num-exemplars ${exemplars} \
-    --head-init-mode ${head_init} \
-    --pretrained
+    --head-init-mode ${head_init}
 fi

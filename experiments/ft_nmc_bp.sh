@@ -10,16 +10,18 @@ num_tasks=$5
 nc_first_task=$6
 network=$7
 num_epochs=$8
-wu_epochs=${9:-0}
-wu_lr=${10:-0.1}
-wu_wd=${11:-0}
-lr=${12:-0.1}
-stop_at_task=${13:-0}
+lr=${9:-0.1}
+head_init=${10}
+stop_at_task=${11:-0}
+update_prototypes=${12:-0}
+exemplars=${13:-20}
+bsz=${14:-128}
 
-if [ ${wu_epochs} -gt 0 ]; then
-  exp_name="cifar100t${num_tasks}s${nc_first_task}_${tag}_wu_wd:${wu_wd}"
-  result_path="results/${tag}/ft_wu_${seed}"
-  python3 src/main_incremental.py \
+
+if [ ${update_prototypes} -gt 0 ]; then
+    exp_name="t${num_tasks}s${nc_first_task}_hz_m:${exemplars}_up:${update_prototypes}"
+    result_path="results/${tag}/ft_nmc_hz_${seed}"
+    python3 src/main_incremental.py \
     --exp-name ${exp_name} \
     --gpu ${gpu} \
     --datasets ${dataset} \
@@ -29,25 +31,22 @@ if [ ${wu_epochs} -gt 0 ]; then
     --use-test-as-val \
     --lr ${lr} \
     --nepochs ${num_epochs} \
-    --batch-size 128 \
+    --batch-size ${bsz} \
     --seed ${seed} \
     --log disk wandb \
     --results-path ${result_path} \
     --tags ${tag} \
     --scheduler-milestones \
-    --cm \
     --stop-at-task ${stop_at_task} \
-    --approach finetuning \
-    --num-exemplars 2000 \
-    --wu-nepochs ${wu_epochs} \
-    --wu-lr ${wu_lr} \
-    --wu-wd ${wu_wd} \
-    --wu-fix-bn \
-    --wu-scheduler cosine
+    --approach ft_nmc \
+    --num-exemplars ${exemplars} \
+    --head-init-mode ${head_init} \
+    --update_prototypes \
+    --best_prototypes
 else
-  exp_name="cifar100t${num_tasks}s${nc_first_task}_${tag}_base"
-  result_path="results/${tag}/ft_base_${seed}"
-  python3 src/main_incremental.py \
+    exp_name="t${num_tasks}s${nc_first_task}_hz_m:${exemplars}_up:${update_prototypes}"
+    result_path="results/${tag}/ft_nmc_hz_${seed}"
+    python3 src/main_incremental.py \
     --exp-name ${exp_name} \
     --gpu ${gpu} \
     --datasets ${dataset} \
@@ -57,14 +56,15 @@ else
     --use-test-as-val \
     --lr ${lr} \
     --nepochs ${num_epochs} \
-    --batch-size 128 \
+    --batch-size ${bsz} \
     --seed ${seed} \
     --log disk wandb \
     --results-path ${result_path} \
     --tags ${tag} \
     --scheduler-milestones \
-    --cm \
     --stop-at-task ${stop_at_task} \
-    --approach finetuning \
-    --num-exemplars 2000
+    --approach ft_nmc \
+    --num-exemplars ${exemplars} \
+    --head-init-mode ${head_init} \
+    --best_prototypes
 fi

@@ -41,7 +41,8 @@ if [ ${update_prototypes} -gt 0 ]; then
     --approach ft_nmc \
     --num-exemplars ${exemplars} \
     --head-init-mode ${head_init} \
-    --update_prototypes
+    --update_prototypes \
+    --pretrained
 else
     exp_name="t${num_tasks}s${nc_first_task}_hz_m:${exemplars}_up:${update_prototypes}"
     result_path="results/${tag}/ft_nmc_hz_${seed}"
@@ -64,5 +65,6 @@ else
     --stop-at-task ${stop_at_task} \
     --approach ft_nmc \
     --num-exemplars ${exemplars} \
-    --head-init-mode ${head_init}
+    --head-init-mode ${head_init} \
+    --pretrained
 fi
