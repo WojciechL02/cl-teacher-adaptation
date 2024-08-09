@@ -10,17 +10,19 @@ num_tasks=$5
 nc_first_task=$6
 network=$7
 num_epochs=$8
-lr=${9:-0.1}
-head_init=${10}
-stop_at_task=${11:-0}
-lamb=${12:-1}
-update_prototypes=${13:-0}
+wu_epochs=${9:-0}
+wu_lr=${10:-0.1}
+wu_wd=${11:-0.0}
+lr=${12:-0.1}
+head_init=${13}
+stop_at_task=${14:-0}
+exemplars=${15:-20}
+bsz=${16:-128}
 
-
-if [ ${update_prototypes} -gt 0 ]; then
-    exp_name="cifar100t${num_tasks}s${nc_first_task}_${tag}_hz_up:${update_prototypes}"
-    result_path="results/${tag}/msp_nmc_hz_${seed}"
-    python3 src/main_incremental.py \
+if [ ${wu_epochs} -gt 0 ]; then
+  exp_name="t${num_tasks}s${nc_first_task}_wu_hz_wd:${wu_wd}_m:${exemplars}"
+  result_path="results/${tag}/ft_wu_hz_${seed}"
+  python3 src/main_incremental.py \
     --exp-name ${exp_name} \
     --gpu ${gpu} \
     --datasets ${dataset} \
@@ -29,24 +31,28 @@ if [ ${update_prototypes} -gt 0 ]; then
     --network ${network} \
     --use-test-as-val \
     --lr ${lr} \
+    --wu-wd ${wu_wd} \
     --nepochs ${num_epochs} \
-    --batch-size 128 \
+    --batch-size ${bsz} \
     --seed ${seed} \
     --log disk wandb \
     --results-path ${result_path} \
     --tags ${tag} \
-    --scheduler-milestones \
     --cm \
     --stop-at-task ${stop_at_task} \
-    --approach msp_nmc \
-    --lamb ${lamb} \
-    --num-exemplars 2000 \
+    --approach finetuning \
+    --scheduler-milestones \
+    --num-exemplars ${exemplars} \
+    --wu-nepochs ${wu_epochs} \
+    --wu-lr ${wu_lr} \
+    --wu-fix-bn \
+    --wu-scheduler cosine \
     --head-init-mode ${head_init} \
-    --update_prototypes
+    --pretrained
 else
-    exp_name="cifar100t${num_tasks}s${nc_first_task}_${tag}_hz_up:${update_prototypes}"
-    result_path="results/${tag}/msp_nmc_hz_${seed}"
-    python3 src/main_incremental.py \
+  exp_name="t${num_tasks}s${nc_first_task}_hz_m:${exemplars}"
+  result_path="results/${tag}/ft_hz_${seed}"
+  python3 src/main_incremental.py \
     --exp-name ${exp_name} \
     --gpu ${gpu} \
     --datasets ${dataset} \
@@ -55,8 +61,9 @@ else
     --network ${network} \
     --use-test-as-val \
     --lr ${lr} \
+    --wu-wd ${wu_wd} \
     --nepochs ${num_epochs} \
-    --batch-size 128 \
+    --batch-size ${bsz} \
     --seed ${seed} \
     --log disk wandb \
     --results-path ${result_path} \
@@ -64,8 +71,8 @@ else
     --scheduler-milestones \
     --cm \
     --stop-at-task ${stop_at_task} \
-    --approach msp_nmc \
-    --lamb ${lamb} \
-    --num-exemplars 2000 \
-    --head-init-mode ${head_init}
+    --approach finetuning \
+    --num-exemplars ${exemplars} \
+    --head-init-mode ${head_init} \
+    --pretrained
 fi
