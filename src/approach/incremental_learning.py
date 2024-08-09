@@ -48,7 +48,7 @@ class Inc_Learning_Appr:
         self.no_learning = no_learning
 
         self.last_e_accs = None # variable for stability-gap metric
-        self.log_grad_norm = True
+        self.log_grad_norm = False
         self.projector = None # UMAP
 
     @staticmethod
@@ -394,11 +394,14 @@ class Inc_Learning_Appr:
                     for ts in range(sg.shape[0]):
                         self.logger.log_scalar(task=ts, iter=None, name="stability_gap", value=100 * sg[ts].item(), group="cont_eval")
                         self.logger.log_scalar(task=ts, iter=None, name="stability_gap_normal", value=100 * sg_normalized[ts].item(), group="cont_eval")
-                        self.logger.log_scalar(task=None, iter=None, name="stability_gap_avg", value=100 * sg.mean().item(), group="cont_eval")
 
                         self.logger.log_scalar(task=ts, iter=None, name="recovery", value=100 * rec[ts].item(), group="cont_eval")
                         self.logger.log_scalar(task=ts, iter=None, name="recovery_normal", value=100 * rec_normalized[ts].item(), group="cont_eval")
-                        self.logger.log_scalar(task=None, iter=None, name="recovery_avg", value=100 * rec.mean().item(), group="cont_eval")
+                                            
+                    self.logger.log_scalar(task=None, iter=None, name="stability_gap_avg", value=100 * sg.mean().item(), group="cont_eval")
+                    self.logger.log_scalar(task=None, iter=None, name="recovery_avg", value=100 * rec.mean().item(), group="cont_eval")
+                    self.logger.log_scalar(task=None, iter=None, name="sg_normal_avg", value=100 * sg_normalized.mean().item(), group="cont_eval")
+                    self.logger.log_scalar(task=None, iter=None, name="recovery_normal_avg", value=100 * rec_normalized.mean().item(), group="cont_eval")
 
                     # New last acc of prev tasks (current task becomes a prev task)
                     self.last_e_accs = torch.cat((prev_t_accs, torch.tensor([current_acc])))
