@@ -19,7 +19,7 @@ class Appr(Inc_Learning_Appr):
     def __init__(self, model, device, nepochs=60, lr=0.5, lr_min=1e-4, lr_factor=3, lr_patience=5, clipgrad=10000,
                  momentum=0.9, wd=1e-5, multi_softmax=False, wu_nepochs=0, wu_lr=0, wu_wd=0, wu_fix_bn=False, wu_lr_factor=1,
                  fix_bn=False, wu_scheduler='constant', wu_patience=None, eval_on_train=False, select_best_model_by_val_loss=True,
-                 logger=None, exemplars_dataset=None, scheduler_milestones=None, lamb=1, update_prototypes=False):
+                 logger=None, exemplars_dataset=None, scheduler_milestones=None, lamb=1, update_prototypes=False, best_prototypes=False):
         super(Appr, self).__init__(model, device, nepochs, lr, lr_min, lr_factor, lr_patience, clipgrad, momentum, wd,
                                    multi_softmax, wu_nepochs, wu_lr, wu_fix_bn, wu_scheduler, wu_patience, wu_wd,
                                    fix_bn, eval_on_train, select_best_model_by_val_loss, logger, exemplars_dataset,
@@ -29,7 +29,7 @@ class Appr(Inc_Learning_Appr):
         self.val_loader_transform = None
         self.exemplar_means = []
         self.previous_datasets = []
-        self.full_data_prototypes = False
+        self.best_prototypes = best_prototypes
 
         # iCaRL is expected to be used with exemplars. If needed to be used without exemplars, overwrite here the
         # `_get_optimizer` function with the one in LwF and update the criterion
@@ -50,6 +50,8 @@ class Appr(Inc_Learning_Appr):
                             help='Forgetting-intransigence trade-off (default=%(default)s)')
         parser.add_argument('--update_prototypes', action='store_true',
                             help='Update prototypes on every epoch (default=%(default)s)')
+        parser.add_argument('--best_prototypes', action='store_true',
+                            help='Calculate prototypes on full trainset (default=%(default)s)')
         return parser.parse_known_args(args)
 
     # Algorithm 1: iCaRL NCM Classify
@@ -77,7 +79,7 @@ class Appr(Inc_Learning_Appr):
     def compute_mean_of_exemplars(self, trn_loader, transform):
         # change transforms to evaluation for this calculation
         dataset = self.exemplars_dataset
-        if self.full_data_prototypes:
+        if self.best_prototypes:
             dataset = self.previous_datasets[0]
             if len(self.previous_datasets) > 1:
                 for subset in self.previous_datasets[1:]:
