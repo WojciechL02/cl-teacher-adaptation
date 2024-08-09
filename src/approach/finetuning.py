@@ -36,6 +36,12 @@ class Appr(Inc_Learning_Appr):
 
     def _get_optimizer(self):
         """Returns the optimizer"""
+        if self.slca and len(self.model.heads) > 1:
+            backbone_params = {'params': self.model.model.parameters(), 'lr': self.lr * 0.01}
+            head_params = {'params': self.model.heads.parameters()}
+            network_params = [backbone_params, head_params]
+            return torch.optim.SGD(network_params, lr=self.lr, weight_decay=self.wd, momentum=self.momentum)
+        
         if len(self.exemplars_dataset) == 0 and len(self.model.heads) > 1 and not self.all_out:
             # if there are no exemplars, previous heads are not modified
             params = list(self.model.model.parameters()) + list(self.model.heads[-1].parameters())

@@ -50,6 +50,7 @@ class Inc_Learning_Appr:
         self.last_e_accs = None # variable for stability-gap metric
         self.log_grad_norm = True
         self.projector = None # UMAP
+        self.slca = True
 
     @staticmethod
     def extra_parser(args):
@@ -66,6 +67,11 @@ class Inc_Learning_Appr:
 
     def _get_optimizer(self):
         """Returns the optimizer"""
+        if self.slca and len(self.model.heads) > 1:
+            backbone_params = {'params': self.model.model.parameters(), 'lr': self.lr * 0.01}
+            head_params = {'params': self.model.heads.parameters()}
+            network_params = [backbone_params, head_params]
+            return torch.optim.SGD(network_params, lr=self.lr, weight_decay=self.wd, momentum=self.momentum)
         return torch.optim.SGD(self.model.parameters(), lr=self.lr, weight_decay=self.wd, momentum=self.momentum)
 
     def _get_scheduler(self):
