@@ -111,8 +111,7 @@ class Appr(Inc_Learning_Appr):
                 cls_feats_mean = cls_feats.mean(0) / cls_feats.mean(0).norm()
                 self.exemplar_means.append(cls_feats_mean)
     
-    def compute_means_of_current_classes(self, trn_loader):
-        loader = deepcopy(trn_loader)
+    def compute_means_of_current_classes(self, loader):
         extracted_features = []
         extracted_targets = []
         with torch.no_grad():

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH --time=24:00:00   # walltime
-#SBATCH --ntasks=3   # number of processor cores (i.e. tasks)
+#SBATCH --ntasks=8   # number of processor cores (i.e. tasks)
 #SBATCH --gpus=1
 
 set -e

@@ -471,21 +471,21 @@ class Inc_Learning_Appr:
         self.model.set_state_dict(best_model)
 
         # MEASURE LAST HEAD DISTANCE/SIMILARITY
-        if t > 0:
-            head_after_wu_vect = torch.nn.utils.parameters_to_vector(head_after_wu.parameters()).unsqueeze(0)
-            head_curr_vect = torch.nn.utils.parameters_to_vector(self.model.heads[-1].parameters()).unsqueeze(0)
+        # if t > 0:
+        #     head_after_wu_vect = torch.nn.utils.parameters_to_vector(head_after_wu.parameters()).unsqueeze(0)
+        #     head_curr_vect = torch.nn.utils.parameters_to_vector(self.model.heads[-1].parameters()).unsqueeze(0)
 
-            # L2 distance
-            l2_dist = torch.linalg.vector_norm(head_after_wu_vect - head_curr_vect, 2)
-            self.logger.log_scalar(task=None, iter=None, name='L2 distance', group=f"Last head", value=l2_dist.item())
+        #     # L2 distance
+        #     l2_dist = torch.linalg.vector_norm(head_after_wu_vect - head_curr_vect, 2)
+        #     self.logger.log_scalar(task=None, iter=None, name='L2 distance', group=f"Last head", value=l2_dist.item())
 
-            # Cosine Similarity
-            cos_sim = torch.nn.functional.cosine_similarity(head_after_wu_vect, head_curr_vect)
-            self.logger.log_scalar(task=None, iter=None, name='Cos-Sim', group=f"Last head", value=cos_sim.item())
+        #     # Cosine Similarity
+        #     cos_sim = torch.nn.functional.cosine_similarity(head_after_wu_vect, head_curr_vect)
+        #     self.logger.log_scalar(task=None, iter=None, name='Cos-Sim', group=f"Last head", value=cos_sim.item())
 
-            # L2 of the final classifier
-            final_clf_l2 = torch.linalg.vector_norm(head_curr_vect, 2)
-            self.logger.log_scalar(task=None, iter=None, name='clf L2', group=f"Last head", value=final_clf_l2.item())
+        #     # L2 of the final classifier
+        #     final_clf_l2 = torch.linalg.vector_norm(head_curr_vect, 2)
+        #     self.logger.log_scalar(task=None, iter=None, name='clf L2', group=f"Last head", value=final_clf_l2.item())
 
             # self._log_heads_activation_statistics(t)
 
