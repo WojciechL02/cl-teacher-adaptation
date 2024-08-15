@@ -20,14 +20,14 @@ exemplars=${15:-20}
 bsz=${16:-128}
 
 if [ ${wu_epochs} -gt 0 ]; then
-  exp_name="t${num_tasks}s${nc_first_task}_wu_hz_wd:${wu_wd}_m:${exemplars}"
+  exp_name="t${num_tasks}s20_wu_hz_wd:${wu_wd}_m:${exemplars}"
   result_path="results/${tag}/ft_wu_hz_${seed}"
   python3 src/main_incremental.py \
     --exp-name ${exp_name} \
     --gpu ${gpu} \
     --datasets ${dataset} \
     --num-tasks ${num_tasks} \
-    --nc-first-task ${nc_first_task} \
+    --nc-first-task 10 \
     --network ${network} \
     --use-test-as-val \
     --lr ${lr} \
@@ -38,11 +38,10 @@ if [ ${wu_epochs} -gt 0 ]; then
     --log disk wandb \
     --results-path ${result_path} \
     --tags ${tag} \
-    --cm \
     --stop-at-task ${stop_at_task} \
     --approach finetuning \
     --scheduler-milestones \
-    --num-exemplars ${exemplars} \
+    --num-exemplars-per-class ${exemplars} \
     --wu-nepochs ${wu_epochs} \
     --wu-lr ${wu_lr} \
     --wu-fix-bn \
@@ -50,14 +49,14 @@ if [ ${wu_epochs} -gt 0 ]; then
     --head-init-mode ${head_init} \
     --pretrained
 else
-  exp_name="t${num_tasks}s${nc_first_task}_hz_m:${exemplars}"
+  exp_name="t${num_tasks}s20_hz_m:${exemplars}"
   result_path="results/${tag}/ft_hz_${seed}"
   python3 src/main_incremental.py \
     --exp-name ${exp_name} \
     --gpu ${gpu} \
     --datasets ${dataset} \
     --num-tasks ${num_tasks} \
-    --nc-first-task ${nc_first_task} \
+    --nc-first-task 10 \
     --network ${network} \
     --use-test-as-val \
     --lr ${lr} \
@@ -69,10 +68,9 @@ else
     --results-path ${result_path} \
     --tags ${tag} \
     --scheduler-milestones \
-    --cm \
     --stop-at-task ${stop_at_task} \
     --approach finetuning \
-    --num-exemplars ${exemplars} \
+    --num-exemplars-per-class ${exemplars} \
     --head-init-mode ${head_init} \
     --pretrained
 fi

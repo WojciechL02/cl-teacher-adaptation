@@ -176,7 +176,14 @@ class Appr(Inc_Learning_Appr):
         features = features.unsqueeze(2)
         features = features.expand_as(means)
         # get distances for all images to all exemplar class means -- nearest prototype
-        dists = (features - means).pow(2).sum(1).squeeze()
+        dists = (features - means).pow(2).sum(1, keepdim=True).squeeze(dim=1)
+
+        ##################### COSINE DIST
+        # cosine_sim = torch.bmm(features.transpose(1, 2), means).sum(1)
+        # cosine_sim = cosine_sim.squeeze()
+        # dists = 1 - cosine_sim
+        #####################
+
         # Task-Aware Multi-Head
         num_cls = self.model.task_cls[task]
         offset = self.model.task_offset[task]
@@ -249,9 +256,10 @@ class Appr(Inc_Learning_Appr):
         """Runs after training all the epochs of the task (after the train session)"""
 
         # Restore best and save model for future tasks
-        self.model_old = deepcopy(self.model)
-        self.model_old.eval()
-        self.model_old.freeze_all()
+        # self.model_old = deepcopy(self.model)
+        # self.model_old.eval()
+        # self.model_old.freeze_all()
+        pass
         
     def train_epoch(self, t, trn_loader):
         """Runs a single epoch"""
@@ -270,12 +278,12 @@ class Appr(Inc_Learning_Appr):
             batch_size = images.shape[0]
             f1, f2 = torch.split(features, [batch_size, batch_size], dim=0)
             y = torch.cat([f1.unsqueeze(1), f2.unsqueeze(1)], dim=1)
-            if t > 0:
-                self.model_old.eval()
-                y_old = self.model_old(images1)
-                loss = self.criterion(t, y, targets, f1, y_old)
-            else:
-                loss = self.criterion(t, y, targets)
+            # if t > 0:
+            #     self.model_old.eval()
+            #     y_old = self.model_old(images1)
+            #     loss = self.criterion(t, y, targets, f1, y_old)
+            # else:
+            loss = self.criterion(t, y, targets)
             self.logger.log_scalar(task=None, iter=None, name="loss", value=loss.item(), group="train")
             # Backward
             self.optimizer.zero_grad()

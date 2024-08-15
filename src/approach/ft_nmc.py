@@ -19,11 +19,11 @@ class Appr(Inc_Learning_Appr):
     def __init__(self, model, device, nepochs=60, lr=0.5, lr_min=1e-4, lr_factor=3, lr_patience=5, clipgrad=10000,
                  momentum=0.9, wd=1e-5, multi_softmax=False, wu_nepochs=0, wu_lr=0, wu_wd=0, wu_fix_bn=False, wu_lr_factor=1,
                  fix_bn=False, wu_scheduler='constant', wu_patience=None, eval_on_train=False, select_best_model_by_val_loss=True,
-                 logger=None, exemplars_dataset=None, scheduler_milestones=None, lamb=1, update_prototypes=False, best_prototypes=False):
+                 logger=None, exemplars_dataset=None, scheduler_milestones=None, lamb=1, update_prototypes=False, best_prototypes=False, slca=False):
         super(Appr, self).__init__(model, device, nepochs, lr, lr_min, lr_factor, lr_patience, clipgrad, momentum, wd,
                                    multi_softmax, wu_nepochs, wu_lr, wu_fix_bn, wu_scheduler, wu_patience, wu_wd,
                                    fix_bn, eval_on_train, select_best_model_by_val_loss, logger, exemplars_dataset,
-                                   scheduler_milestones)
+                                   scheduler_milestones, slca)
         self.lamb = lamb
         self.update_prototypes = update_prototypes
         self.val_loader_transform = None
@@ -65,7 +65,7 @@ class Appr(Inc_Learning_Appr):
         features = features.unsqueeze(2)
         features = features.expand_as(means)
         # get distances for all images to all exemplar class means -- nearest prototype
-        dists = (features - means).pow(2).sum(1).squeeze()
+        dists = (features - means).pow(2).sum(1, keepdim=True).squeeze(dim=1)
         # Task-Aware Multi-Head
         num_cls = self.model.task_cls[task]
         offset = self.model.task_offset[task]
@@ -111,17 +111,17 @@ class Appr(Inc_Learning_Appr):
                 cls_feats_mean = cls_feats.mean(0) / cls_feats.mean(0).norm()
                 self.exemplar_means.append(cls_feats_mean)
     
-    def compute_means_of_current_classes(self, trn_loader):
-        loader = deepcopy(trn_loader)
-        extracted_features = []
-        extracted_targets = []
-        with torch.no_grad():
-            self.model.eval()
-            for images, targets in loader:
-                feats = self.model(images.to(self.device), return_features=True)[1]
-                # normalize
-                extracted_features.append(feats / feats.norm(dim=1).view(-1, 1))
-                extracted_targets.extend(targets)
+    def compute_means_of_current_classes(self, loader, extr_features=None, extr_targets=None):
+        extracted_features = [] if extr_features is None else extr_features
+        extracted_targets = [] if extr_targets is None else extr_targets
+        if extr_features is None:
+            with torch.no_grad():
+                self.model.eval()
+                for images, targets in loader:
+                    feats = self.model(images.to(self.device), return_features=True)[1]
+                    # normalize
+                    extracted_features.append(feats / feats.norm(dim=1).view(-1, 1))
+                    extracted_targets.extend(targets)
         extracted_features = torch.cat(extracted_features)
         extracted_targets = np.array(extracted_targets)
         for curr_cls in np.unique(extracted_targets):
@@ -136,19 +136,26 @@ class Appr(Inc_Learning_Appr):
         
     def train_epoch(self, t, trn_loader):
         """Runs a single epoch"""
+        # extracted_features = []
+        # extracted_targets = []
         self.model.train()
         if self.fix_bn and t > 0:
             self.model.freeze_bn()
 
         for images, targets in trn_loader:
             # Forward current model
-            outputs = self.model(images.to(self.device))
+            outputs, feats = self.model(images.to(self.device), return_features=True)
             loss = self.criterion(t, outputs, targets.to(self.device))
             # Backward
             self.optimizer.zero_grad()
             loss.backward()
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.clipgrad)
             self.optimizer.step()
+
+            # means of current classes
+            # feats = feats.detach()
+            # extracted_features.append(feats / feats.norm(dim=1).view(-1, 1))
+            # extracted_targets.extend(targets)
 
         if self.scheduler is not None:
             self.scheduler.step()
@@ -164,6 +171,7 @@ class Appr(Inc_Learning_Appr):
             else:
                 # leave prototypes of old classes unchanged
                 self.exemplar_means.extend(old_classes_prototypes)
+        # self.compute_means_of_current_classes(trn_loader, extracted_features, extracted_targets)
         self.compute_means_of_current_classes(trn_loader)
 
     # Algorithm 2: iCaRL Incremental Train
@@ -225,6 +233,9 @@ class Appr(Inc_Learning_Appr):
         prev_t_acc = torch.zeros((t,), requires_grad=False)
         current_t_acc = 0.
         sum_acc = 0.
+        total_loss_curr = 0.
+        total_num_curr = 0
+        current_t_acc_taw = 0
         with torch.no_grad():
             loaders = self.tst_loader[:t + 1]
 
@@ -239,7 +250,7 @@ class Appr(Inc_Learning_Appr):
                     outputs, feats = self.model(images, return_features=True)
 
                     if not self.exemplar_means:
-                        hits_taw, hits_tag = self.calculate_metrics(outputs, targets)
+                        hits_taw, hits_tag= self.calculate_metrics(outputs, targets)
                     else:
                         hits_taw, hits_tag = self.classify(task_id, feats, targets)
 
@@ -247,6 +258,11 @@ class Appr(Inc_Learning_Appr):
                     total_acc_tag += hits_tag.sum().data.cpu().numpy().item()
                     total_acc_taw += hits_taw.sum().data.cpu().numpy().item()
                     total_num += len(targets)
+
+                    if task_id == t:
+                        loss = self.criterion(t, outputs, targets)
+                        total_loss_curr += loss.item() * len(targets)
+                        total_num_curr += len(targets)
 
                 acc_tag = total_acc_tag / total_num
                 acc_taw = total_acc_taw / total_num
@@ -257,10 +273,11 @@ class Appr(Inc_Learning_Appr):
                     prev_t_acc[task_id] = acc_tag
                 else:
                     current_t_acc = acc_tag
+                    current_t_acc_taw = acc_taw
 
             if t > 0:
                 # Average accuracy over all previous tasks
                 self.logger.log_scalar(task=None, iter=None, name="avg_acc_tag", value=100 * sum_acc / t, group="cont_eval")
         avg_prev_acc = sum_acc / t if t > 0 else 0.
-        return prev_t_acc, current_t_acc, avg_prev_acc
+        return prev_t_acc, current_t_acc, avg_prev_acc, total_loss_curr / total_num_curr, current_t_acc_taw
         # acc poprzednich tasków, acc na aktualnym tasku, średnia z poprzednich tasków

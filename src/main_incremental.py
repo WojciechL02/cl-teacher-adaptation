@@ -143,6 +143,8 @@ def main(argv=None):
                         help='Additional data augmentations (default=%(default)s)')
     parser.add_argument('--reset-backbone', action='store_true',
                         help='Reset backbone weights between tasks ((default=%(default)s))')
+    parser.add_argument('--slca', action='store_true',
+                        help='Training with SLCA ((default=%(default)s))')
 
     # gridsearch args
     parser.add_argument('--gridsearch-tasks', default=0, type=int,
@@ -253,7 +255,7 @@ def main(argv=None):
     trn_loader, val_loader, tst_loader, taskcla = get_loaders(args.datasets, args.num_tasks, args.nc_first_task,
                                                               args.nc_per_task,
                                                               args.batch_size, num_workers=args.num_workers,
-                                                              pin_memory=True,
+                                                              pin_memory=False,
                                                               max_classes_per_dataset=args.max_classes_per_dataset,
                                                               max_examples_per_class_trn=args.max_examples_per_class_trn,
                                                               max_examples_per_class_val=args.max_examples_per_class_val,

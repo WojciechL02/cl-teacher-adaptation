@@ -19,14 +19,14 @@ bsz=${14:-128}
 
 
 if [ ${update_prototypes} -gt 0 ]; then
-    exp_name="t${num_tasks}s${nc_first_task}_hz_m:${exemplars}_up:${update_prototypes}"
+    exp_name="t${num_tasks}s20_hz_m:${exemplars}_up:${update_prototypes}"
     result_path="results/${tag}/ft_nmc_hz_${seed}"
     python3 src/main_incremental.py \
     --exp-name ${exp_name} \
     --gpu ${gpu} \
     --datasets ${dataset} \
     --num-tasks ${num_tasks} \
-    --nc-first-task ${nc_first_task} \
+    --nc-first-task 10 \
     --network ${network} \
     --use-test-as-val \
     --lr ${lr} \
@@ -39,19 +39,19 @@ if [ ${update_prototypes} -gt 0 ]; then
     --scheduler-milestones \
     --stop-at-task ${stop_at_task} \
     --approach ft_nmc \
-    --num-exemplars ${exemplars} \
+    --num-exemplars-per-class ${exemplars} \
     --head-init-mode ${head_init} \
     --update_prototypes \
     --pretrained
 else
-    exp_name="t${num_tasks}s${nc_first_task}_hz_m:${exemplars}_up:${update_prototypes}"
+    exp_name="t${num_tasks}s20_hz_m:${exemplars}_up:${update_prototypes}"
     result_path="results/${tag}/ft_nmc_hz_${seed}"
     python3 src/main_incremental.py \
     --exp-name ${exp_name} \
     --gpu ${gpu} \
     --datasets ${dataset} \
     --num-tasks ${num_tasks} \
-    --nc-first-task ${nc_first_task} \
+    --nc-first-task 10 \
     --network ${network} \
     --use-test-as-val \
     --lr ${lr} \
@@ -64,7 +64,7 @@ else
     --scheduler-milestones \
     --stop-at-task ${stop_at_task} \
     --approach ft_nmc \
-    --num-exemplars ${exemplars} \
+    --num-exemplars-per-class ${exemplars} \
     --head-init-mode ${head_init} \
     --pretrained
 fi
