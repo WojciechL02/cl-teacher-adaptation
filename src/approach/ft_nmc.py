@@ -279,5 +279,5 @@ class Appr(Inc_Learning_Appr):
                 # Average accuracy over all previous tasks
                 self.logger.log_scalar(task=None, iter=None, name="avg_acc_tag", value=100 * sum_acc / t, group="cont_eval")
         avg_prev_acc = sum_acc / t if t > 0 else 0.
-        return prev_t_acc, current_t_acc, avg_prev_acc, total_loss_curr / total_num_curr, current_t_acc_taw
+        return prev_t_acc, current_t_acc, avg_prev_acc  #, total_loss_curr / total_num_curr, current_t_acc_taw
         # acc poprzednich tasków, acc na aktualnym tasku, średnia z poprzednich tasków

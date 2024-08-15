@@ -344,7 +344,7 @@ class Inc_Learning_Appr:
                 # Average accuracy over all previous tasks
                 self.logger.log_scalar(task=None, iter=None, name="avg_acc_tag", value=100 * sum_acc / t, group="cont_eval")
         avg_prev_acc = sum_acc / t if t > 0 else 0.
-        return prev_t_acc, current_t_acc, avg_prev_acc, total_loss_curr / total_num_curr, current_t_acc_taw
+        return prev_t_acc, current_t_acc, avg_prev_acc  #, total_loss_curr / total_num_curr, current_t_acc_taw
         # acc poprzednich tasków, acc na aktualnym tasku, średnia z poprzednich tasków
 
     def _log_weight_norms(self, t, prev_w, prev_b, new_w, new_b):
@@ -380,48 +380,48 @@ class Inc_Learning_Appr:
 
             # CONTINUAL EVALUATION
             ####################################################################
-            # # prev_t_accs, current_acc, avg_prev_acc, _, _ = self._continual_evaluation_step(t)
-            # prev_t_accs, current_acc, avg_prev_acc = self._continual_evaluation_step(t)
-            # # valid_locc and valid_acc are on test_loaders so it works when --use-test-as-val
+            # prev_t_accs, current_acc, avg_prev_acc, _, _ = self._continual_evaluation_step(t)
+            prev_t_accs, current_acc, avg_prev_acc = self._continual_evaluation_step(t)
+            # valid_locc and valid_acc are on test_loaders so it works when --use-test-as-val
 
-            # # save accs on last epoch of task 0
-            # if t == 0 and e == self.nepochs - 1:
-            #     self.last_e_accs = torch.tensor([current_acc])
+            # save accs on last epoch of task 0
+            if t == 0 and e == self.nepochs - 1:
+                self.last_e_accs = torch.tensor([current_acc])
 
-            # if t > 0:
-            #     # min-ACC
-            #     min_accs_prev = torch.minimum(min_accs_prev, prev_t_accs)
-            #     min_acc = min_accs_prev.mean().item()
-            #     self.logger.log_scalar(task=None, iter=None, name="min_acc", value=100 * min_acc, group="cont_eval")
+            if t > 0:
+                # min-ACC
+                min_accs_prev = torch.minimum(min_accs_prev, prev_t_accs)
+                min_acc = min_accs_prev.mean().item()
+                self.logger.log_scalar(task=None, iter=None, name="min_acc", value=100 * min_acc, group="cont_eval")
 
-            #     # WC-ACC
-            #     k = t + 1
-            #     wc_acc = (1 / k) * current_acc + (1 - (1 / k)) * min_acc
-            #     self.logger.log_scalar(task=None, iter=None, name="wc_acc", value=100 * wc_acc, group="cont_eval")
+                # WC-ACC
+                k = t + 1
+                wc_acc = (1 / k) * current_acc + (1 - (1 / k)) * min_acc
+                self.logger.log_scalar(task=None, iter=None, name="wc_acc", value=100 * wc_acc, group="cont_eval")
 
-            #     # in last epoch of tasks > 0
-            #     if e == self.nepochs - 1:
-            #         # Stability Gap
-            #         sg = self.last_e_accs - min_accs_prev
-            #         sg_normalized = torch.div(sg, self.last_e_accs)
-            #         # Recovery
-            #         rec = prev_t_accs - min_accs_prev  # in last epoch prev_t_accs is final_acc of prev tasks
-            #         rec_normalized = torch.div(rec, self.last_e_accs)
-            #         # Log SG and REC
-            #         for ts in range(sg.shape[0]):
-            #             self.logger.log_scalar(task=ts, iter=None, name="stability_gap", value=100 * sg[ts].item(), group="cont_eval")
-            #             self.logger.log_scalar(task=ts, iter=None, name="stability_gap_normal", value=100 * sg_normalized[ts].item(), group="cont_eval")
+                # in last epoch of tasks > 0
+                if e == self.nepochs - 1:
+                    # Stability Gap
+                    sg = self.last_e_accs - min_accs_prev
+                    sg_normalized = torch.div(sg, self.last_e_accs)
+                    # Recovery
+                    rec = prev_t_accs - min_accs_prev  # in last epoch prev_t_accs is final_acc of prev tasks
+                    rec_normalized = torch.div(rec, self.last_e_accs)
+                    # Log SG and REC
+                    for ts in range(sg.shape[0]):
+                        self.logger.log_scalar(task=ts, iter=None, name="stability_gap", value=100 * sg[ts].item(), group="cont_eval")
+                        self.logger.log_scalar(task=ts, iter=None, name="stability_gap_normal", value=100 * sg_normalized[ts].item(), group="cont_eval")
 
-            #             self.logger.log_scalar(task=ts, iter=None, name="recovery", value=100 * rec[ts].item(), group="cont_eval")
-            #             self.logger.log_scalar(task=ts, iter=None, name="recovery_normal", value=100 * rec_normalized[ts].item(), group="cont_eval")
+                        self.logger.log_scalar(task=ts, iter=None, name="recovery", value=100 * rec[ts].item(), group="cont_eval")
+                        self.logger.log_scalar(task=ts, iter=None, name="recovery_normal", value=100 * rec_normalized[ts].item(), group="cont_eval")
                                             
-            #         self.logger.log_scalar(task=None, iter=None, name="stability_gap_avg", value=100 * sg.mean().item(), group="cont_eval")
-            #         self.logger.log_scalar(task=None, iter=None, name="recovery_avg", value=100 * rec.mean().item(), group="cont_eval")
-            #         self.logger.log_scalar(task=None, iter=None, name="sg_normal_avg", value=100 * sg_normalized.mean().item(), group="cont_eval")
-            #         self.logger.log_scalar(task=None, iter=None, name="recovery_normal_avg", value=100 * rec_normalized.mean().item(), group="cont_eval")
+                    self.logger.log_scalar(task=None, iter=None, name="stability_gap_avg", value=100 * sg.mean().item(), group="cont_eval")
+                    self.logger.log_scalar(task=None, iter=None, name="recovery_avg", value=100 * rec.mean().item(), group="cont_eval")
+                    self.logger.log_scalar(task=None, iter=None, name="sg_normal_avg", value=100 * sg_normalized.mean().item(), group="cont_eval")
+                    self.logger.log_scalar(task=None, iter=None, name="recovery_normal_avg", value=100 * rec_normalized.mean().item(), group="cont_eval")
 
-            #         # New last acc of prev tasks (current task becomes a prev task)
-            #         self.last_e_accs = torch.cat((prev_t_accs, torch.tensor([current_acc])))
+                    # New last acc of prev tasks (current task becomes a prev task)
+                    self.last_e_accs = torch.cat((prev_t_accs, torch.tensor([current_acc])))
             ####################################################################
 
             clock1 = time.time()
@@ -489,21 +489,21 @@ class Inc_Learning_Appr:
         self.model.set_state_dict(best_model)
 
         # MEASURE LAST HEAD DISTANCE/SIMILARITY
-        if t > 0:
-            head_after_wu_vect = torch.nn.utils.parameters_to_vector(head_after_wu.parameters()).unsqueeze(0)
-            head_curr_vect = torch.nn.utils.parameters_to_vector(self.model.heads[-1].parameters()).unsqueeze(0)
+        # if t > 0:
+        #     head_after_wu_vect = torch.nn.utils.parameters_to_vector(head_after_wu.parameters()).unsqueeze(0)
+        #     head_curr_vect = torch.nn.utils.parameters_to_vector(self.model.heads[-1].parameters()).unsqueeze(0)
 
-            # L2 distance
-            l2_dist = torch.linalg.vector_norm(head_after_wu_vect - head_curr_vect, 2)
-            self.logger.log_scalar(task=None, iter=None, name='L2 distance', group=f"Last head", value=l2_dist.item())
+        #     # L2 distance
+        #     l2_dist = torch.linalg.vector_norm(head_after_wu_vect - head_curr_vect, 2)
+        #     self.logger.log_scalar(task=None, iter=None, name='L2 distance', group=f"Last head", value=l2_dist.item())
 
-            # Cosine Similarity
-            cos_sim = torch.nn.functional.cosine_similarity(head_after_wu_vect, head_curr_vect)
-            self.logger.log_scalar(task=None, iter=None, name='Cos-Sim', group=f"Last head", value=cos_sim.item())
+        #     # Cosine Similarity
+        #     cos_sim = torch.nn.functional.cosine_similarity(head_after_wu_vect, head_curr_vect)
+        #     self.logger.log_scalar(task=None, iter=None, name='Cos-Sim', group=f"Last head", value=cos_sim.item())
 
-            # L2 of the final classifier
-            final_clf_l2 = torch.linalg.vector_norm(head_curr_vect, 2)
-            self.logger.log_scalar(task=None, iter=None, name='clf L2', group=f"Last head", value=final_clf_l2.item())
+        #     # L2 of the final classifier
+        #     final_clf_l2 = torch.linalg.vector_norm(head_curr_vect, 2)
+        #     self.logger.log_scalar(task=None, iter=None, name='clf L2', group=f"Last head", value=final_clf_l2.item())
 
             # self._log_heads_activation_statistics(t)
 

@@ -59,7 +59,7 @@ def main(argv=None):
     # dataset args
     parser.add_argument('--datasets', default=['cifar100'], type=str, choices=list(dataset_config.keys()),
                         help='Dataset or datasets used (default=%(default)s)', nargs='+', metavar="DATASET")
-    parser.add_argument('--num-workers', default=4, type=int, required=False,
+    parser.add_argument('--num-workers', default=7, type=int, required=False,
                         help='Number of subprocesses to use for dataloader (default=%(default)s)')
     parser.add_argument('--batch-size', default=64, type=int, required=False,
                         help='Number of samples per batch to load (default=%(default)s)')
@@ -315,8 +315,8 @@ def main(argv=None):
         print('*' * 108)
 
         # save current model for next CKA calculation
-        prev_t_net = deepcopy(net)  # save also the model from before the training
-        prev_t_net.to(device)
+        # prev_t_net = deepcopy(net)  # save also the model from before the training
+        # prev_t_net.to(device)
 
         # Add head for current task
         net.add_head(taskcla[t][1])
@@ -384,26 +384,26 @@ def main(argv=None):
         if t == 0 and args.ne_first_task is not None:
             appr.nepochs = args.nepochs
 
-        # Measure distance between previous and current model
-        prev_vect = torch.nn.utils.parameters_to_vector(prev_t_net.model.parameters()).unsqueeze(0)
-        curr_vect = torch.nn.utils.parameters_to_vector(net.model.parameters()).unsqueeze(0)
+        # # Measure distance between previous and current model
+        # prev_vect = torch.nn.utils.parameters_to_vector(prev_t_net.model.parameters()).unsqueeze(0)
+        # curr_vect = torch.nn.utils.parameters_to_vector(net.model.parameters()).unsqueeze(0)
 
-        # L2 distance
-        l2_dist = torch.linalg.vector_norm(prev_vect - curr_vect, 2)
-        logger.log_scalar(task=None, iter=None, name='L2', group=f"Model distance", value=l2_dist.item())
+        # # L2 distance
+        # l2_dist = torch.linalg.vector_norm(prev_vect - curr_vect, 2)
+        # logger.log_scalar(task=None, iter=None, name='L2', group=f"Model distance", value=l2_dist.item())
 
-        # Cosine Similarity
-        cos_sim = torch.nn.functional.cosine_similarity(prev_vect, curr_vect)
-        logger.log_scalar(task=None, iter=None, name='Cos-Sim', group=f"Model distance", value=cos_sim.item())
+        # # Cosine Similarity
+        # cos_sim = torch.nn.functional.cosine_similarity(prev_vect, curr_vect)
+        # logger.log_scalar(task=None, iter=None, name='Cos-Sim', group=f"Model distance", value=cos_sim.item())
 
         # Test
         for u in range(t + 1):
             test_loss[t, u], acc_taw[t, u], acc_tag[t, u] = appr.eval(u, tst_loader[u])
 
             # CKA
-            if t > 0:
-                _cka = cka(net, prev_t_net, tst_loader[u], device)
-                logger.log_scalar(task=None, iter=None, name=f't_{u}', group=f"cka", value=_cka)
+            # if t > 0:
+            #     _cka = cka(net, prev_t_net, tst_loader[u], device)
+            #     logger.log_scalar(task=None, iter=None, name=f't_{u}', group=f"cka", value=_cka)
 
             # FORG
             if u < t:
@@ -422,7 +422,7 @@ def main(argv=None):
             logger.log_scalar(task=u, iter=t, name='forg_tag', group='test', value=100 * forg_tag[t, u])
 
         # save current model for next CKA calculation
-        prev_t_net = deepcopy(net)
+        # prev_t_net = deepcopy(net)
 
         # Save
         print('Save at ' + os.path.join(args.results_path, full_exp_name))
