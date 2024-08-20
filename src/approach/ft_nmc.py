@@ -2,6 +2,7 @@ import torch
 import warnings
 import numpy as np
 from copy import deepcopy
+from collections import Counter
 from argparse import ArgumentParser
 from torch.utils.data import DataLoader
 
@@ -232,6 +233,7 @@ class Appr(Inc_Learning_Appr):
         return torch.nn.functional.cross_entropy(outputs[t], targets - self.model.task_offset[t])
     
     def _continual_evaluation_step(self, t):
+        confusion_matrix = torch.zeros((t+1, t+1))
         prev_t_acc = torch.zeros((t,), requires_grad=False)
         current_t_acc = 0.
         sum_acc = 0.
@@ -246,25 +248,37 @@ class Appr(Inc_Learning_Appr):
                 total_acc_tag = 0.
                 total_acc_taw = 0.
                 total_num = 0
+                task_ids = []
                 for images, targets in loader:
                     images, targets = images.to(self.device), targets.to(self.device)
                     # Forward current model
                     outputs, feats = self.model(images, return_features=True)
+                    outputs_stacked = torch.stack(outputs, dim=1)
+                    shape = outputs_stacked.shape
+
+                    if task_id == t:
+                        loss = self.criterion(t, outputs, targets)
+                        total_loss_curr += loss.item() * len(targets)
+                        total_num_curr += total_num
 
                     if not self.exemplar_means:
-                        hits_taw, hits_tag= self.calculate_metrics(outputs, targets)
+                        hits_taw, hits_tag = self.calculate_metrics(outputs, targets)
                     else:
-                        hits_taw, hits_tag = self.classify(task_id, feats, targets)
+                        hits_taw, hits_tag, outputs = self.classify(task_id, feats, targets, return_dists=True)
+                        outputs = outputs.view(shape[0], shape[1], shape[2])
+                        outputs = torch.min(outputs, dim=-1)[0]
+                        outputs = outputs.argmin(dim=-1)
 
                     # Log
                     total_acc_tag += hits_tag.sum().data.cpu().numpy().item()
                     total_acc_taw += hits_taw.sum().data.cpu().numpy().item()
                     total_num += len(targets)
 
-                    if task_id == t:
-                        loss = self.criterion(t, outputs, targets)
-                        total_loss_curr += loss.item() * len(targets)
-                        total_num_curr += len(targets)
+                    task_ids.extend(outputs.tolist())
+                
+                counts = Counter(task_ids)
+                for j, val in counts.items():
+                    confusion_matrix[task_id, j] = val / len(loader.dataset)
 
                 acc_tag = total_acc_tag / total_num
                 acc_taw = total_acc_taw / total_num
@@ -280,6 +294,11 @@ class Appr(Inc_Learning_Appr):
             if t > 0:
                 # Average accuracy over all previous tasks
                 self.logger.log_scalar(task=None, iter=None, name="avg_acc_tag", value=100 * sum_acc / t, group="cont_eval")
+        
+        if t > 0:
+            recency_bias = confusion_matrix[:-1, -1].mean()
+            self.logger.log_scalar(task=None, iter=None, name="task_recency_bias", value=recency_bias.item(), group="cont_eval")
+
         avg_prev_acc = sum_acc / t if t > 0 else 0.
         return prev_t_acc, current_t_acc, avg_prev_acc  #, total_loss_curr / total_num_curr, current_t_acc_taw
         # acc poprzednich tasków, acc na aktualnym tasku, średnia z poprzednich tasków

@@ -1,5 +1,6 @@
 import time
 from copy import deepcopy
+from collections import Counter
 import torch
 import numpy as np
 from argparse import ArgumentParser
@@ -300,6 +301,7 @@ class Inc_Learning_Appr:
         return output
 
     def _continual_evaluation_step(self, t):
+        confusion_matrix = torch.zeros((t+1, t+1))
         prev_t_acc = torch.zeros((t,), requires_grad=False)
         current_t_acc = 0.
         sum_acc = 0.
@@ -314,6 +316,7 @@ class Inc_Learning_Appr:
                 total_acc_tag = 0.
                 total_acc_taw = 0.
                 total_num = 0
+                task_ids = []
                 for images, targets in loader:
                     images, targets = images.to(self.device), targets.to(self.device)
                     # Forward current model
@@ -328,6 +331,14 @@ class Inc_Learning_Appr:
                         loss = self.criterion(t, outputs, targets)
                         total_loss_curr += loss.item() * len(targets)
                         total_num_curr += total_num
+                    
+                    outputs = torch.stack(outputs, dim=1)
+                    outputs = torch.max(outputs, dim=-1)[0]
+                    task_ids.extend(outputs.argmax(dim=-1).tolist())
+                
+                counts = Counter(task_ids)
+                for j, val in counts.items():
+                    confusion_matrix[task_id, j] = val / len(loader.dataset)
 
                 acc_tag = total_acc_tag / total_num
                 acc_taw = total_acc_taw / total_num
@@ -343,6 +354,11 @@ class Inc_Learning_Appr:
             if t > 0:
                 # Average accuracy over all previous tasks
                 self.logger.log_scalar(task=None, iter=None, name="avg_acc_tag", value=100 * sum_acc / t, group="cont_eval")
+
+        if t > 0:
+            recency_bias = confusion_matrix[:-1, -1].mean()
+            self.logger.log_scalar(task=None, iter=None, name="task_recency_bias", value=recency_bias.item(), group="cont_eval")
+
         avg_prev_acc = sum_acc / t if t > 0 else 0.
         return prev_t_acc, current_t_acc, avg_prev_acc  #, total_loss_curr / total_num_curr, current_t_acc_taw
         # acc poprzednich tasków, acc na aktualnym tasku, średnia z poprzednich tasków
