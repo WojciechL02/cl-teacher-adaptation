@@ -45,13 +45,14 @@ def cm(appr, dataloaders, n_tasks, device):
                 images = images.to(device)
                 targets = targets.to(device)
                 outputs, feats = model(images, return_features=True)
-                outputs = torch.stack(outputs, dim=1)
-                outputs = torch.max(outputs, dim=-1)[0]
-                outputs = outputs.argmax(dim=-1)
-                if appr.exemplar_means:
-                    _, _, outputs = appr.classify(i, feats, targets)
+                try:
+                    _, _, outputs = appr.classify(i, feats, targets, return_dists=True)
+                    outputs = torch.min(outputs.unsqueeze(1), dim=-1)[0]
+                except Exception:
+                    outputs = torch.stack(outputs, dim=1)
+                    outputs = torch.max(outputs, dim=-1)[0]
 
-                task_ids.extend(outputs.tolist())
+                task_ids.extend(outputs.argmax(dim=-1).tolist())
             counts = Counter(task_ids)
             for j, val in counts.items():
                 confusion_matrix[i, j] = val / len(dl.dataset)
