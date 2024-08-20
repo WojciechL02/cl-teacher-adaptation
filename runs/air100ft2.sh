@@ -25,6 +25,6 @@ exemplars=10
 
 # without warm-up:
 # for seed in 0 1 2; do
-./experiments/ft_pretr.sh 0 0 ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} 0 0 0.0 ${lr} ${head_init} ${stop_at_task} ${exemplars} ${bsz}
+./experiments/ft_pretr.sh 0 2 ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} 0 0 0.0 ${lr} ${head_init} ${stop_at_task} ${exemplars} ${bsz}
 # done
 # wait

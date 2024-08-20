@@ -27,7 +27,7 @@ if [ ${wu_epochs} -gt 0 ]; then
     --gpu ${gpu} \
     --datasets ${dataset} \
     --num-tasks ${num_tasks} \
-    --nc-first-task 10 \
+    --nc-per-task 12 10 10 10 10 10 10 10 10 10 \
     --network ${network} \
     --use-test-as-val \
     --lr ${lr} \
@@ -47,7 +47,8 @@ if [ ${wu_epochs} -gt 0 ]; then
     --wu-fix-bn \
     --wu-scheduler cosine \
     --head-init-mode ${head_init} \
-    --pretrained
+    --pretrained \
+    --slca
 else
   exp_name="t${num_tasks}s20_hz_m:${exemplars}"
   result_path="results/${tag}/ft_hz_${seed}"
@@ -56,7 +57,7 @@ else
     --gpu ${gpu} \
     --datasets ${dataset} \
     --num-tasks ${num_tasks} \
-    --nc-first-task 10 \
+    --nc-per-task 12 10 10 10 10 10 10 10 10 10 \
     --network ${network} \
     --use-test-as-val \
     --lr ${lr} \
@@ -72,5 +73,6 @@ else
     --approach finetuning \
     --num-exemplars-per-class ${exemplars} \
     --head-init-mode ${head_init} \
-    --pretrained
+    --pretrained \
+    --slca
 fi

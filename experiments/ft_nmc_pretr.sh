@@ -26,7 +26,7 @@ if [ ${update_prototypes} -gt 0 ]; then
     --gpu ${gpu} \
     --datasets ${dataset} \
     --num-tasks ${num_tasks} \
-    --nc-first-task 10 \
+    --nc-per-task 12 10 10 10 10 10 10 10 10 10 \
     --network ${network} \
     --use-test-as-val \
     --lr ${lr} \
@@ -42,7 +42,8 @@ if [ ${update_prototypes} -gt 0 ]; then
     --num-exemplars-per-class ${exemplars} \
     --head-init-mode ${head_init} \
     --update_prototypes \
-    --pretrained
+    --pretrained \
+    --slca
 else
     exp_name="t${num_tasks}s20_hz_m:${exemplars}_up:${update_prototypes}"
     result_path="results/${tag}/ft_nmc_hz_${seed}"
@@ -51,7 +52,7 @@ else
     --gpu ${gpu} \
     --datasets ${dataset} \
     --num-tasks ${num_tasks} \
-    --nc-first-task 10 \
+    --nc-per-task 12 10 10 10 10 10 10 10 10 10 \
     --network ${network} \
     --use-test-as-val \
     --lr ${lr} \
@@ -66,5 +67,6 @@ else
     --approach ft_nmc \
     --num-exemplars-per-class ${exemplars} \
     --head-init-mode ${head_init} \
-    --pretrained
+    --pretrained \
+    --slca
 fi
