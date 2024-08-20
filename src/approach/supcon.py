@@ -129,11 +129,10 @@ class Appr(Inc_Learning_Appr):
 
         color_jitter = transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
         self.trn_transforms = transforms.Compose([
-            transforms.RandomResizedCrop(size=32, scale=(0.2, 1.)),
             transforms.RandomHorizontalFlip(),
             transforms.RandomApply([color_jitter], p=0.8),
             transforms.RandomGrayscale(p=0.2),
-            transforms.Normalize((0.5071, 0.4866, 0.4409), (0.2009, 0.1984, 0.2023)),
+            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
         ])
 
         self.val_loader_transform = None
@@ -314,7 +313,10 @@ class Appr(Inc_Learning_Appr):
 
         # RESET AUGMENTATIONS =========================
         dataset = trn_loader.dataset
-        dataset.transform = transforms.ToTensor()
+        dataset.transform = transforms.Compose([
+            transforms.RandomResizedCrop(size=224, scale=(0.2, 1.)),
+            transforms.ToTensor()
+        ])
         trn_loader = torch.utils.data.DataLoader(dataset,
                                                 batch_size=trn_loader.batch_size,
                                                 shuffle=True,
@@ -333,6 +335,10 @@ class Appr(Inc_Learning_Appr):
                                                      shuffle=True,
                                                      num_workers=trn_loader.num_workers,
                                                      pin_memory=trn_loader.pin_memory)
+            trn_loader.dataset.transform = transforms.Compose([
+                transforms.RandomResizedCrop(size=224, scale=(0.2, 1.)),
+                transforms.ToTensor()
+            ])
 
         # FINETUNING TRAINING -- contains the epochs loop
         super().train_loop(t, trn_loader, val_loader)

@@ -55,7 +55,7 @@ class Appr(Inc_Learning_Appr):
         return parser.parse_known_args(args)
 
     # Algorithm 1: iCaRL NCM Classify
-    def classify(self, task, features, targets):
+    def classify(self, task, features, targets, return_pred=False):
         # expand means to all batch images
         means = torch.stack(self.exemplar_means)
         means = torch.stack([means] * features.shape[0])
@@ -74,6 +74,8 @@ class Appr(Inc_Learning_Appr):
         # Task-Agnostic Multi-Head
         pred = dists.argmin(1)
         hits_tag = (pred == targets.to(self.device)).float()
+        if return_pred:
+            return hits_taw, hits_tag, pred
         return hits_taw, hits_tag
 
     def compute_mean_of_exemplars(self, trn_loader, transform):

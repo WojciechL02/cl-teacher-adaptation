@@ -431,7 +431,7 @@ def main(argv=None):
         logger.log_result(forg_taw, name="forg_taw", step=t, skip_wandb=True)
         logger.log_result(forg_tag, name="forg_tag", step=t, skip_wandb=True)
         if args.cm:
-            logger.log_result(cm(appr.model, tst_loader[:t + 1], args.num_tasks, appr.device), name="cm", step=t,
+            logger.log_result(cm(appr, tst_loader[:t + 1], args.num_tasks, appr.device), name="cm", step=t,
                               title="Task confusion matrix", xlabel="Predicted task", ylabel="True task", annot=True,
                               cmap='Blues', cbar=True, vmin=0, vmax=1)
 
