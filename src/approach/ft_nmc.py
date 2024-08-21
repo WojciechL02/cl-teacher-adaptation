@@ -81,11 +81,10 @@ class Appr(Inc_Learning_Appr):
 
     def compute_mean_of_exemplars(self, trn_loader, transform):
         # change transforms to evaluation for this calculation
-        dataset = self.exemplars_dataset
+        dataset = self.previous_datasets[0] if self.best_prototypes else self.exemplars_dataset
         if self.best_prototypes:
-            dataset = self.previous_datasets[0]
             if len(self.previous_datasets) > 1:
-                for subset in self.previous_datasets[1:]:
+                for subset in self.previous_datasets[1:-1]:
                     dataset += subset
         with override_dataset_transform(dataset, transform) as _ds:
             # change dataloader so it can be fixed to go sequentially (shuffle=False), this allows to keep same order
