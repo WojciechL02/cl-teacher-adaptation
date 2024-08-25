@@ -101,23 +101,23 @@ def main():
     }
     hue_dict = {
         "FT_500": 0,
-        "NMC_500": 1,
-        "FT_1000": 2,
-        "NMC_1000": 3,
-        "FT_2000": 4,
-        "NMC_2000": 5,
-        "FT_5000": 6,
+        "NMC_500": 4,
+        "FT_1000": 1,
+        "NMC_1000": 5,
+        "FT_2000": 2,
+        "NMC_2000": 6,
+        "FT_5000": 3,
         "NMC_5000": 7,
     }
     color_dict = {
-        "FT_500": "tab:gray",
-        "NMC_500": "tab:pink",
-        "FT_1000": "tab:green",
+        "FT_500": "tab:red",
+        "NMC_500": "tab:red",
+        "FT_1000": "tab:orange",
         "NMC_1000": "tab:orange",
-        "FT_2000": "tab:red",
+        "FT_2000": "tab:blue",
         "NMC_2000": "tab:blue",
-        "FT_5000": "tab:purple",
-        "NMC_5000": "tab:brown",
+        "FT_5000": "tab:green",
+        "NMC_5000": "tab:green",
     }
     dashes_dict = {
         "FT_500": (2, 0),
@@ -184,13 +184,24 @@ def main():
         handles[labels.index("FT_5000")],
         handles[labels.index("NMC_5000")],
     ]
+    labels = [
+        "500 ex",
+        '+ NMC',
+        "1000 ex",
+        '+ NMC',
+        "2000 ex",
+        '+ NMC',
+        "5000 ex",
+        '+ NMC',
+    ]
     plot.legend(
         handles=handles,
         labels=labels,
-        loc="best",
+        ncol=4,
         fontsize=12,
         title=None,
-        bbox_to_anchor=(1, 1),
+        loc="lower center",
+        handlelength=1.5
     )
 
     # Save figure
