@@ -16,7 +16,7 @@ class Appr(Inc_Learning_Appr):
         super(Appr, self).__init__(model, device, nepochs, lr, lr_min, lr_factor, lr_patience, clipgrad, momentum, wd,
                                    multi_softmax, wu_nepochs, wu_lr, wu_fix_bn, wu_scheduler, wu_patience, wu_wd,
                                    fix_bn, eval_on_train, select_best_model_by_val_loss, logger, exemplars_dataset,
-                                   scheduler_milestones, no_learning, slca)
+                                   scheduler_milestones, no_learning, slca=slca)
         self.all_out = all_outputs
 
     @staticmethod

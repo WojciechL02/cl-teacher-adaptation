@@ -152,6 +152,7 @@ def main(argv=None):
 
     # Args -- Incremental Learning Framework
     args, extra_args = parser.parse_known_args(argv)
+    print(args.slca)
     args.results_path = os.path.expanduser(args.results_path)
     base_kwargs = dict(nepochs=args.nepochs, lr=args.lr, lr_min=args.lr_min, lr_factor=args.lr_factor,
                        lr_patience=args.lr_patience, clipgrad=args.clipping, momentum=args.momentum,
@@ -159,7 +160,7 @@ def main(argv=None):
                        wu_lr=args.wu_lr, wu_fix_bn=args.wu_fix_bn, wu_scheduler=args.wu_scheduler,
                        wu_patience=args.wu_patience, wu_wd=args.wu_wd, fix_bn=args.fix_bn,
                        eval_on_train=args.eval_on_train, select_best_model_by_val_loss=True,
-                       scheduler_milestones=args.scheduler_milestones)
+                       scheduler_milestones=args.scheduler_milestones, slca=args.slca)
 
     if args.no_cudnn_deterministic:
         print('WARNING: CUDNN Deterministic will be disabled.')
