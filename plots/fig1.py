@@ -4,13 +4,14 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-from plots.constants import (
+from constants import (
     COLOR_PALETTE,
     HUE_ORDER,
     LEGEND_FONTSIZE,
     NAME_FT,
     NAME_NMC_EX,
     NAME_NMC_FULL,
+    NAME_FT_WU,
     PLOT_LINEWIDTH,
     TEXT_FONTSIZE,
     TICK_FONTSIZE,
@@ -50,8 +51,8 @@ def main():
     root = Path(__file__).parent
     output_dir = root / "plots"
     output_dir.mkdir(exist_ok=True, parents=True)
-    output_path_png = output_dir / "fig1.png"
-    output_path_pdf = output_dir / "fig1.pdf"
+    output_path_png = output_dir / "fig_wu.png"
+    output_path_pdf = output_dir / "fig_wu.pdf"
 
     # Filters for the runs
     tag = "figure1"
@@ -85,7 +86,7 @@ def main():
     # Set names for the legend
     name_dict = {
         "cifar100_icarl_finetuning_t10s10_hz_m:2000": NAME_FT,
-        "cifar100_icarl_ft_nmc_t10s10_hz_m:2000_up:1_full_set_prot": NAME_NMC_FULL,
+        "cifar100_icarl_finetuning_t10s10_wu_hz_wd:0.0_m:2000": NAME_FT_WU,
         "cifar100_icarl_ft_nmc_t10s10_hz_m:2000_up:1": NAME_NMC_EX,
     }
     df = df[df["run_name"].isin(name_dict.keys())]
@@ -98,9 +99,15 @@ def main():
 
     # Plot configuration
     xlabel = "Task"
-    ylabel = "Accuracy"
+    ylabel = "Task 1 Accuracy"
     title = "CIFAR100 | 10 tasks"
     yticks = [10, 20, 30, 40, 50, 60, 70]
+
+    hue = {
+        NAME_FT: 1,
+        NAME_NMC_EX: 2,
+        NAME_FT_WU: 3,
+    }
 
     plot = sns.lineplot(
         data=df,
@@ -108,7 +115,7 @@ def main():
         y="acc",
         hue="run_name",
         palette=COLOR_PALETTE,
-        hue_order=HUE_ORDER,
+        hue_order=hue,
         linewidth=PLOT_LINEWIDTH,
     )
     plot.set_title(title)
@@ -132,7 +139,7 @@ def main():
     handles = [
         handles[labels.index(NAME_FT)],
         handles[labels.index(NAME_NMC_EX)],
-        handles[labels.index(NAME_NMC_FULL)],
+        handles[labels.index(NAME_FT_WU)],
     ]
     plot.legend(
         handles=handles,

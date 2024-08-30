@@ -50,8 +50,8 @@ def main():
     root = Path(__file__).parent
     output_dir = root / "plots"
     output_dir.mkdir(exist_ok=True, parents=True)
-    output_path_png = output_dir / "fig5b.png"
-    output_path_pdf = output_dir / "fig5b.pdf"
+    output_path_png = output_dir / "fig5b_sl.png"
+    output_path_pdf = output_dir / "fig5b_sl.pdf"
 
     # Filters for the runs
     tag = "slca"
@@ -59,8 +59,6 @@ def main():
     num_tasks = 10
     nepochs = 100
     approaches = ["ft_nmc", "finetuning"]
-    names = ["zany-elevator-1470", "electric-capybara-1465", "x0.1", "helpful-fire-1469", "astral-snowflake-1466"]
-    air_names = ["x0.1", "no-slca"]
 
     # Get all runs for the plots from wandb server"
     api = Api(api_key=wandb_api_key)
@@ -76,8 +74,7 @@ def main():
         },
     )
     runs = list(runs)
-    runs = [r for r in runs if r.name not in air_names]
-
+    runs = [r for r in runs if r.config["slca"]]
     print(len(runs))
 
     # Parse runs to plotting format
@@ -104,7 +101,7 @@ def main():
     # Plot configuration
     xlabel = "Task"
     ylabel = "Task 1 Accuracy"
-    title = "Aircrafts | 10 tasks"
+    title = "Aircrafts + SL | 10 tasks"
     yticks = [20, 40, 60, 80, 100]
 
     plot = sns.lineplot(

@@ -32,11 +32,12 @@ plt.cla()
 # text = "0.53 0.1 0.087 0.11 0.17 0.09 0.6 0.079 0.081 0.15 0.074 0.08 0.56 0.13 0.16 0.068 0.069 0.099 0.63 0.14 0.085 0.064 0.079 0.1 0.67"
 # JOINT NMC
 text = "0.56 0.11 0.096 0.11 0.12 0.1 0.61 0.091 0.097 0.096 0.091 0.089 0.59 0.13 0.1 0.084 0.086 0.12 0.61 0.098 0.11 0.096 0.12 0.13 0.54"
-values = [round(100 * float(t), 1) for t in text.split()]
-matrix = np.array(values).reshape((5, 5))
-plot = sns.heatmap(matrix, annot=True, cmap='Blues', cbar=True, vmin=0, vmax=100)
 
-title = "Joint NMC"
+values = [100 * float(t) for t in text.split()]
+matrix = np.array(values).reshape((5, 5))
+plot = sns.heatmap(matrix, annot=True, fmt=".1f", cmap='Blues', cbar=True, vmin=0, vmax=100, annot_kws={"size": 16})
+
+title = "Joint + NMC"
 xlabel="Predicted task"
 ylabel="True task"
 
@@ -44,9 +45,9 @@ plot.set_title(title)
 plot.set_xlabel(xlabel)
 
 # Set sizes for text and ticks
-plot.set_xlabel(xlabel, fontsize=TEXT_FONTSIZE)
-plot.set_ylabel(ylabel, fontsize=TEXT_FONTSIZE)
-plot.set_title(title, fontsize=TEXT_FONTSIZE)
+plot.set_xlabel(xlabel, fontsize=16)
+plot.set_ylabel(ylabel, fontsize=16)
+plot.set_title(title, fontsize=16)
 # plot.set_aspect('equal', adjustable='box')
 
 plt.tight_layout()

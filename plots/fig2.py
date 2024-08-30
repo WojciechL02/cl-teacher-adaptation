@@ -52,8 +52,8 @@ def main():
     root = Path(__file__).parent
     output_dir = root / "plots"
     output_dir.mkdir(exist_ok=True, parents=True)
-    output_path_png = output_dir / "fig2.png"
-    output_path_pdf = output_dir / "fig2.pdf"
+    output_path_png = output_dir / "fig2_1.png"
+    output_path_pdf = output_dir / "fig2_1.pdf"
 
     # Filters for the runs
     tag = "figure1"
@@ -72,11 +72,12 @@ def main():
             "config.num_tasks": num_tasks,
             "config.nepochs": nepochs,
             "config.approach": {"$in": approaches},
-            "created_at": {"$gt": "2024-08-20T01"},
             "state": "finished",
         },
     )
     runs = list(runs)
+    runs = [r for r in runs if "figure1" in r.tags or "joint" in r.tags]
+    runs = [r for r in runs if r.config["num_exemplars"] == 2000 or r.config["num_exemplars_per_class"] == 500]
     print(len(runs))
 
     # Parse runs to plotting format
@@ -92,7 +93,7 @@ def main():
         "cifar100_icarl_finetuning_t5s20_hz_m:2000": NAME_FT,
         "cifar100_icarl_ft_nmc_t5s20_hz_m:2000_up:1": NAME_NMC_EX,
         "cifar100_icarl_finetuning_t5s20_hz_m:500": NAME_JOINT,
-        "cifar100_icarl_ft_nmc_t5s20_hz_m:500_up:1": NAME_JOINT_NMC,
+        # "cifar100_icarl_ft_nmc_t5s20_hz_m:500_up:1": NAME_JOINT_NMC,
     }
     df = df[df["run_name"].isin(name_dict.keys())]
     df["run_name"] = df["run_name"].map(name_dict)
@@ -156,7 +157,7 @@ def main():
         handles[labels.index(NAME_FT)],
         handles[labels.index(NAME_NMC_EX)],
         handles[labels.index(NAME_JOINT)],
-        handles[labels.index(NAME_JOINT_NMC)],
+        # handles[labels.index(NAME_JOINT_NMC)],
     ]
     plot.legend(
         handles=handles,
