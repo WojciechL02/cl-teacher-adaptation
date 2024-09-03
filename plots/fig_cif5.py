@@ -107,7 +107,7 @@ def main():
     xlabel = "Finished Task"
     ylabel = "Task 1 Accuracy"
     title = f"CIFAR100 | {num_tasks} tasks"
-    yticks = [10, 20, 30, 40, 50, 60, 70]
+    yticks = [10, 20, 30, 40, 50, 60]
 
     plot = sns.lineplot(
         data=df,

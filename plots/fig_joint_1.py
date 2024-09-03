@@ -26,7 +26,7 @@ def parse_run(run, num_tasks):
     run_name = run.group
 
     # download all the values of 'cont_eval_acc_tag/t_0' from the run
-    metric_name = "cont_eval_acc_tag/t_0"
+    metric_name = "test/avg_acc_tag"
     cont_eval = run.history(keys=[("%s" % metric_name)], samples=100000)[metric_name]
     max_steps = len(cont_eval)
     steps_per_task = max_steps // num_tasks
@@ -34,7 +34,7 @@ def parse_run(run, num_tasks):
         {
             "run_name": run_name,
             "seed": seed,
-            "task": step / steps_per_task,
+            "task": step+1,
             "acc": acc,
         }
         for step, acc in enumerate(cont_eval)
@@ -50,14 +50,15 @@ def main():
     root = Path(__file__).parent
     output_dir = root / "plots"
     output_dir.mkdir(exist_ok=True, parents=True)
-    output_path_png = output_dir / "fig_in10.png"
-    output_path_pdf = output_dir / "fig_in10.pdf"
+    output_path_png = output_dir / "fig_joint_1.png"
+    output_path_pdf = output_dir / "fig_joint_1.pdf"
 
     # Filters for the runs
     tag = "figure1"
-    dataset = "imagenet_subset_kaggle"
+    dataset = "cifar100_icarl"
     num_tasks = 10
     nepochs = 100
+    exemplars = 500
     approaches = ["ft_nmc", "finetuning"]
 
     # Get all runs for the plots from wandb server"
@@ -65,20 +66,18 @@ def main():
     runs = api.runs(
         path=f"{wandb_entity}/{wandb_project}",
         filters={
-            "tags": tag,
             "config.datasets": [dataset],
             "config.num_tasks": num_tasks,
             "config.nepochs": nepochs,
             "config.approach": {"$in": approaches},
+            "config.num_exemplars_per_class": exemplars,
+            "created_at": {"$gt": "2024-08-23T01"},
             "state": "finished",
         },
     )
     runs = list(runs)
+
     print(len(runs))
-    # for r in runs:
-    #     if "best_prototypes" in r.config.keys():
-    #         if r.config["best_prototypes"] == True:
-    #             r.group += "_full_set_prot"
 
     # Parse runs to plotting format
     parsed_runs = [
@@ -90,11 +89,9 @@ def main():
 
     # Set names for the legend
     name_dict = {
-        "imagenet_subset_kaggle_finetuning_t10s10_hz_m:2000": NAME_FT,
-        # "imagenet_subset_kaggle_ft_nmc_t5s20_hz_m:2000_up:1_full_set_prot": NAME_NMC_FULL,
-        "imagenet_subset_kaggle_ft_nmc_t10s10_hz_m:2000_up:1": NAME_NMC_EX,
+        "cifar100_icarl_finetuning_t10s10_hz_m:500": NAME_FT,
+        "cifar100_icarl_ft_nmc_t10s10_hz_m:500_up:1": NAME_NMC_EX,
     }
-    # print(df)
     df = df[df["run_name"].isin(name_dict.keys())]
     df["run_name"] = df["run_name"].map(name_dict)
 
@@ -105,9 +102,9 @@ def main():
 
     # Plot configuration
     xlabel = "Finished Task"
-    ylabel = "Task 1 Accuracy"
-    title = f"ImageNet-Subset | {num_tasks} tasks"
-    yticks = [10, 20, 30, 40, 50, 60, 70, 80, 90]
+    ylabel = "Average Accuracy"
+    title = "CIFAR100 | 10 tasks"
+    yticks = [45, 50, 55, 60, 65, 70, 75]
 
     plot = sns.lineplot(
         data=df,
@@ -120,11 +117,10 @@ def main():
     )
     plot.set_title(title)
     plot.set_xlabel(xlabel)
-    plt.xticks(range(num_tasks + 1))
-    plot.set_xlim(0, num_tasks)
+    plt.xticks(range(1, num_tasks+1))
+    plot.set_xlim(1, num_tasks)
+    plot.set_ylim(bottom=40)
     plot.set_ylabel(ylabel)
-    # Set lower limit on y axis to 0
-    plot.set_ylim(bottom=0)
     plot.set_yticks(yticks)
 
     # Set sizes for text and ticks
@@ -139,7 +135,6 @@ def main():
     handles = [
         handles[labels.index(NAME_FT)],
         handles[labels.index(NAME_NMC_EX)],
-        # handles[labels.index(NAME_NMC_FULL)],
     ]
     plot.legend(
         handles=handles,

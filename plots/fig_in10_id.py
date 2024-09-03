@@ -106,7 +106,7 @@ def main():
     xlabel = "Finished Task"
     ylabel = "Task 1 Accuracy"
     title = f"ImageNet-Subset | {num_tasks} tasks"
-    yticks = [10, 20, 30, 40, 50, 60, 70]
+    yticks = [10, 20, 30, 40, 50, 60, 70, 80, 90]
 
     hue = {
         NAME_FT: 1,

@@ -149,7 +149,7 @@ def main():
     plt.cla()
 
     # Plot configuration
-    xlabel = "FInished Task"
+    xlabel = "Finished Task"
     ylabel = "Average Accuracy"
     title = "CIFAR100 | 10 tasks"
     yticks = [10, 20, 30, 40, 50, 60, 70]
