@@ -43,7 +43,7 @@ def parse_run(run, num_tasks):
 
 
 def main():
-    os.environ['WANDB_API_KEY'] = '434fcc1957118a52a224c4d4a88db52186983f58'
+    # os.environ['WANDB_API_KEY'] = '434fcc1957118a52a224c4d4a88db52186983f58'
     wandb_api_key = os.environ["WANDB_API_KEY"]
     wandb_entity = "stability-gap"
     wandb_project = "cl-teacher-adaptation-src"
@@ -105,7 +105,7 @@ def main():
     plt.cla()
 
     # Plot configuration
-    xlabel = "Task"
+    xlabel = "Finished Task"
     ylabel = "Task 1 Accuracy"
     title = "CIFAR100 | 5 tasks"
     yticks = [10, 20, 30, 40, 50, 60, 70]

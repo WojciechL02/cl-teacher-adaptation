@@ -50,15 +50,15 @@ def main():
     root = Path(__file__).parent
     output_dir = root / "plots"
     output_dir.mkdir(exist_ok=True, parents=True)
-    output_path_png = output_dir / "fig8.png"
-    output_path_pdf = output_dir / "fig8.pdf"
+    output_path_png = output_dir / "fig9.png"
+    output_path_pdf = output_dir / "fig9.pdf"
 
     # Filters for the runs
-    tag = "figure1"
-    dataset = "cifar100_icarl"
+    tag = "slca"
+    dataset = "birds"
     num_tasks = 10
     nepochs = 100
-    exemplars = [2, 5, 10, 20, 50]
+    exemplars = [2, 5, 10]
     approaches = ["ft_nmc", "finetuning"]
 
     # Get all runs for the plots from wandb server"
@@ -72,6 +72,7 @@ def main():
             "config.nepochs": nepochs,
             "config.approach": {"$in": approaches},
             "config.num_exemplars_per_class": {"$in": exemplars},
+            "config.slca": True,
             "state": "finished",
         },
     )
@@ -89,44 +90,36 @@ def main():
 
     # Set names for the legend
     name_dict = {
-        "cifar100_icarl_finetuning_t10s10_hz_m:2": "FT_2",
-        "cifar100_icarl_ft_nmc_t10s10_hz_m:2_up:1": "NMC_2",
-        "cifar100_icarl_finetuning_t10s10_hz_m:50": "FT_50",
-        "cifar100_icarl_ft_nmc_t10s10_hz_m:50_up:1": "NMC_50",
-        "cifar100_icarl_finetuning_t10s10_hz_m:10": "FT_10",
-        "cifar100_icarl_ft_nmc_t10s10_hz_m:10_up:1": "NMC_10",
-        "cifar100_icarl_finetuning_t10s10_hz_m:20": "FT_20",
-        "cifar100_icarl_ft_nmc_t10s10_hz_m:20_up:1": "NMC_20",
+        f"{dataset}_finetuning_t10s20_hz_m:2": "FT_2",
+        f"{dataset}_ft_nmc_t10s20_hz_m:2_up:1": "NMC_2",
+        f"{dataset}_finetuning_t10s20_hz_m:5": "FT_5",
+        f"{dataset}_ft_nmc_t10s20_hz_m:5_up:1": "NMC_5",
+        f"{dataset}_finetuning_t10s20_hz_m:10": "FT_10",
+        f"{dataset}_ft_nmc_t10s20_hz_m:10_up:1": "NMC_10",
     }
     hue_dict = {
         "FT_2": 0,
-        "NMC_2": 4,
-        "FT_50": 1,
-        "NMC_50": 5,
+        "NMC_2": 3,
+        "FT_5": 1,
+        "NMC_5": 4,
         "FT_10": 2,
-        "NMC_10": 6,
-        "FT_20": 3,
-        "NMC_20": 7,
+        "NMC_10": 5,
     }
     color_dict = {
         "FT_2": "tab:red",
         "NMC_2": "tab:red",
-        "FT_50": "tab:orange",
-        "NMC_50": "tab:orange",
+        "FT_5": "tab:orange",
+        "NMC_5": "tab:orange",
         "FT_10": "tab:blue",
         "NMC_10": "tab:blue",
-        "FT_20": "tab:green",
-        "NMC_20": "tab:green",
     }
     dashes_dict = {
         "FT_2": (2, 0),
         "NMC_2": (3, 3),
         "FT_10": (2, 0),
         "NMC_10": (3, 3),
-        "FT_20": (2, 0),
-        "NMC_20": (3, 3),
-        "FT_50": (2, 0),
-        "NMC_50": (3, 3),
+        "FT_5": (2, 0),
+        "NMC_5": (3, 3),
     }
 
     df = df[df["run_name"].isin(name_dict.keys())]
@@ -140,8 +133,8 @@ def main():
     # Plot configuration
     xlabel = "Finished Task"
     ylabel = "Average Accuracy"
-    title = "CIFAR100 | 10 tasks"
-    yticks = [10, 20, 30, 40, 50, 60, 70]
+    title = "Birds + SL | 10 tasks"
+    yticks = [20, 40, 60, 80, 100]
 
     plot = sns.lineplot(
         data=df,
@@ -176,27 +169,23 @@ def main():
     handles = [
         handles[labels.index("FT_2")],
         handles[labels.index("NMC_2")],
+        handles[labels.index("FT_5")],
+        handles[labels.index("NMC_5")],
         handles[labels.index("FT_10")],
         handles[labels.index("NMC_10")],
-        handles[labels.index("FT_20")],
-        handles[labels.index("NMC_20")],
-        handles[labels.index("FT_50")],
-        handles[labels.index("NMC_50")],
     ]
     labels = [
         "2 ex",
         '+ NMC',
+        "5 ex",
+        '+ NMC',
         "10 ex",
-        '+ NMC',
-        "20 ex",
-        '+ NMC',
-        "50 ex",
         '+ NMC',
     ]
     plot.legend(
         handles=handles,
         labels=labels,
-        ncol=4,
+        ncol=3,
         fontsize=12,
         title=None,
         loc="lower center",

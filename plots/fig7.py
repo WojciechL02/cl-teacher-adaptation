@@ -34,7 +34,7 @@ def parse_run(run, num_tasks):
         {
             "run_name": run_name,
             "seed": seed,
-            "task": step,
+            "task": step+1,
             "acc": acc,
         }
         for step, acc in enumerate(cont_eval)
@@ -50,13 +50,13 @@ def main():
     root = Path(__file__).parent
     output_dir = root / "plots"
     output_dir.mkdir(exist_ok=True, parents=True)
-    output_path_png = output_dir / "fig7_t5.png"
-    output_path_pdf = output_dir / "fig7_t5.pdf"
+    output_path_png = output_dir / "fig7.png"
+    output_path_pdf = output_dir / "fig7.pdf"
 
     # Filters for the runs
     tag = "figure1"
     dataset = "cifar100_icarl"
-    num_tasks = 5
+    num_tasks = 10
     nepochs = 100
     exemplars = [100, 200, 500, 1000, 2000, 5000]
     approaches = ["ft_nmc", "finetuning"]
@@ -92,16 +92,16 @@ def main():
 
     # Set names for the legend
     name_dict = {
-        "cifar100_icarl_finetuning_t5s20_hz_m:100": "FT_100",
-        "cifar100_icarl_ft_nmc_t5s20_hz_m:100_up:1": "NMC_100",
-        "cifar100_icarl_finetuning_t5s20_hz_m:500": "FT_500",
-        "cifar100_icarl_ft_nmc_t5s20_hz_m:500_up:1": "NMC_500",
-        "cifar100_icarl_finetuning_t5s20_hz_m:1000": "FT_1000",
-        "cifar100_icarl_ft_nmc_t5s20_hz_m:1000_up:1": "NMC_1000",
-        "cifar100_icarl_finetuning_t5s20_hz_m:2000": "FT_2000",
-        "cifar100_icarl_ft_nmc_t5s20_hz_m:2000_up:1": "NMC_2000",
-        "cifar100_icarl_finetuning_t5s20_hz_m:5000": "FT_5000",
-        "cifar100_icarl_ft_nmc_t5s20_hz_m:5000_up:1": "NMC_5000",
+        "cifar100_icarl_finetuning_t10s10_hz_m:100": "FT_100",
+        "cifar100_icarl_ft_nmc_t10s10_hz_m:100_up:1": "NMC_100",
+        "cifar100_icarl_finetuning_t10s10_hz_m:500": "FT_500",
+        "cifar100_icarl_ft_nmc_t10s10_hz_m:500_up:1": "NMC_500",
+        "cifar100_icarl_finetuning_t10s10_hz_m:1000": "FT_1000",
+        "cifar100_icarl_ft_nmc_t10s10_hz_m:1000_up:1": "NMC_1000",
+        "cifar100_icarl_finetuning_t10s10_hz_m:2000": "FT_2000",
+        "cifar100_icarl_ft_nmc_t10s10_hz_m:2000_up:1": "NMC_2000",
+        "cifar100_icarl_finetuning_t10s10_hz_m:5000": "FT_5000",
+        "cifar100_icarl_ft_nmc_t10s10_hz_m:5000_up:1": "NMC_5000",
     }
     hue_dict = {
         "FT_100": 0,
@@ -149,9 +149,9 @@ def main():
     plt.cla()
 
     # Plot configuration
-    xlabel = "Task"
+    xlabel = "FInished Task"
     ylabel = "Average Accuracy"
-    title = "CIFAR100 | 5 tasks"
+    title = "CIFAR100 | 10 tasks"
     yticks = [10, 20, 30, 40, 50, 60, 70]
 
     plot = sns.lineplot(
@@ -168,8 +168,8 @@ def main():
 
     plot.set_title(title)
     plot.set_xlabel(xlabel)
-    plt.xticks(range(num_tasks))
-    plot.set_xlim(0, num_tasks-1)
+    plt.xticks(range(1, num_tasks+1))
+    plot.set_xlim(1, num_tasks)
     plot.set_ylabel(ylabel)
     # Set lower limit on y axis to 0
     plot.set_ylim(bottom=0)
@@ -186,36 +186,37 @@ def main():
     handles, labels = plot.get_legend_handles_labels()
     handles = [
         handles[labels.index("FT_100")],
-        handles[labels.index("NMC_100")],
         handles[labels.index("FT_500")],
-        handles[labels.index("NMC_500")],
         handles[labels.index("FT_1000")],
-        handles[labels.index("NMC_1000")],
         handles[labels.index("FT_2000")],
-        handles[labels.index("NMC_2000")],
         handles[labels.index("FT_5000")],
+        handles[labels.index("NMC_100")],
+        handles[labels.index("NMC_500")],
+        handles[labels.index("NMC_1000")],
+        handles[labels.index("NMC_2000")],
         handles[labels.index("NMC_5000")],
     ]
     labels = [
         "100 ex",
-        '+ NMC',
         "500 ex",
-        '+ NMC',
         "1000 ex",
-        '+ NMC',
         "2000 ex",
-        '+ NMC',
         "5000 ex",
+        '+ NMC',
+        '+ NMC',
+        '+ NMC',
+        '+ NMC',
         '+ NMC',
     ]
     plot.legend(
         handles=handles,
         labels=labels,
-        ncol=4,
+        ncol=2,
         fontsize=12,
         title=None,
-        loc="lower center",
-        handlelength=1.5
+        loc="upper right",
+        handlelength=1.5,
+        columnspacing=1.0
     )
 
     # Save figure

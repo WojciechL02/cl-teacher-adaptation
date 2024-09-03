@@ -50,8 +50,8 @@ def main():
     root = Path(__file__).parent
     output_dir = root / "plots"
     output_dir.mkdir(exist_ok=True, parents=True)
-    output_path_png = output_dir / "fig6.png"
-    output_path_pdf = output_dir / "fig6.pdf"
+    output_path_png = output_dir / "fig_joint.png"
+    output_path_pdf = output_dir / "fig_joint.pdf"
 
     # Filters for the runs
     tag = "figure1"
@@ -101,7 +101,7 @@ def main():
     plt.cla()
 
     # Plot configuration
-    xlabel = "Task"
+    xlabel = "Finished Task"
     ylabel = "Task 1 Accuracy"
     title = "CIFAR100 | 10 tasks"
     yticks = [10, 20, 30, 40, 50, 60, 70]

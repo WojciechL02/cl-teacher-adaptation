@@ -52,8 +52,8 @@ def main():
     root = Path(__file__).parent
     output_dir = root / "plots"
     output_dir.mkdir(exist_ok=True, parents=True)
-    output_path_png = output_dir / "fig2_1.png"
-    output_path_pdf = output_dir / "fig2_1.pdf"
+    output_path_png = output_dir / "fig2.png"
+    output_path_pdf = output_dir / "fig2.pdf"
 
     # Filters for the runs
     tag = "figure1"
@@ -93,7 +93,7 @@ def main():
         "cifar100_icarl_finetuning_t5s20_hz_m:2000": NAME_FT,
         "cifar100_icarl_ft_nmc_t5s20_hz_m:2000_up:1": NAME_NMC_EX,
         "cifar100_icarl_finetuning_t5s20_hz_m:500": NAME_JOINT,
-        # "cifar100_icarl_ft_nmc_t5s20_hz_m:500_up:1": NAME_JOINT_NMC,
+        "cifar100_icarl_ft_nmc_t5s20_hz_m:500_up:1": NAME_JOINT_NMC,
     }
     df = df[df["run_name"].isin(name_dict.keys())]
     df["run_name"] = df["run_name"].map(name_dict)
@@ -104,7 +104,7 @@ def main():
     plt.cla()
 
     # Plot configuration
-    xlabel = "Task"
+    xlabel = "Finished Task"
     ylabel = "Latest Task Prediction Bias"
     title = "CIFAR100 | 5 tasks"
     yticks = [0.2, 0.4, 0.6, 0.8]
@@ -157,7 +157,7 @@ def main():
         handles[labels.index(NAME_FT)],
         handles[labels.index(NAME_NMC_EX)],
         handles[labels.index(NAME_JOINT)],
-        # handles[labels.index(NAME_JOINT_NMC)],
+        handles[labels.index(NAME_JOINT_NMC)],
     ]
     plot.legend(
         handles=handles,

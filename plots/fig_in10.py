@@ -11,7 +11,6 @@ from constants import (
     NAME_FT,
     NAME_NMC_EX,
     NAME_NMC_FULL,
-    NAME_FT_WU,
     PLOT_LINEWIDTH,
     TEXT_FONTSIZE,
     TICK_FONTSIZE,
@@ -51,12 +50,12 @@ def main():
     root = Path(__file__).parent
     output_dir = root / "plots"
     output_dir.mkdir(exist_ok=True, parents=True)
-    output_path_png = output_dir / "fig_wu.png"
-    output_path_pdf = output_dir / "fig_wu.pdf"
+    output_path_png = output_dir / "fig_in10.png"
+    output_path_pdf = output_dir / "fig_in10.pdf"
 
     # Filters for the runs
     tag = "figure1"
-    dataset = "cifar100_icarl"
+    dataset = "imagenet_subset_kaggle"
     num_tasks = 10
     nepochs = 100
     approaches = ["ft_nmc", "finetuning"]
@@ -71,9 +70,15 @@ def main():
             "config.num_tasks": num_tasks,
             "config.nepochs": nepochs,
             "config.approach": {"$in": approaches},
+            "state": "finished",
         },
     )
     runs = list(runs)
+    print(len(runs))
+    # for r in runs:
+    #     if "best_prototypes" in r.config.keys():
+    #         if r.config["best_prototypes"] == True:
+    #             r.group += "_full_set_prot"
 
     # Parse runs to plotting format
     parsed_runs = [
@@ -85,10 +90,11 @@ def main():
 
     # Set names for the legend
     name_dict = {
-        "cifar100_icarl_finetuning_t10s10_hz_m:2000": NAME_FT,
-        "cifar100_icarl_finetuning_t10s10_wu_hz_wd:0.0_m:2000": NAME_FT_WU,
-        "cifar100_icarl_ft_nmc_t10s10_hz_m:2000_up:1": NAME_NMC_EX,
+        "imagenet_subset_kaggle_finetuning_t10s10_hz_m:2000": NAME_FT,
+        # "imagenet_subset_kaggle_ft_nmc_t5s20_hz_m:2000_up:1_full_set_prot": NAME_NMC_FULL,
+        "imagenet_subset_kaggle_ft_nmc_t10s10_hz_m:2000_up:1": NAME_NMC_EX,
     }
+    # print(df)
     df = df[df["run_name"].isin(name_dict.keys())]
     df["run_name"] = df["run_name"].map(name_dict)
 
@@ -98,16 +104,10 @@ def main():
     plt.cla()
 
     # Plot configuration
-    xlabel = "Task"
+    xlabel = "Finished Task"
     ylabel = "Task 1 Accuracy"
-    title = "CIFAR100 | 10 tasks"
+    title = f"ImageNet-Subset | {num_tasks} tasks"
     yticks = [10, 20, 30, 40, 50, 60, 70]
-
-    hue = {
-        NAME_FT: 1,
-        NAME_NMC_EX: 2,
-        NAME_FT_WU: 3,
-    }
 
     plot = sns.lineplot(
         data=df,
@@ -115,7 +115,7 @@ def main():
         y="acc",
         hue="run_name",
         palette=COLOR_PALETTE,
-        hue_order=hue,
+        hue_order=HUE_ORDER,
         linewidth=PLOT_LINEWIDTH,
     )
     plot.set_title(title)
@@ -139,7 +139,7 @@ def main():
     handles = [
         handles[labels.index(NAME_FT)],
         handles[labels.index(NAME_NMC_EX)],
-        handles[labels.index(NAME_FT_WU)],
+        # handles[labels.index(NAME_NMC_FULL)],
     ]
     plot.legend(
         handles=handles,

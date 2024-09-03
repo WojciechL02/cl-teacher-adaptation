@@ -1,5 +1,5 @@
 NAME_FT = "Finetuning"
-NAME_NMC_FULL = "NMC(Full)"
+NAME_NMC_FULL = "NMC (Ideal)"
 NAME_NMC_EX = "NMC"
 NAME_JOINT = "Joint"
 NAME_JOINT_NMC = "Joint NMC"

@@ -35,9 +35,9 @@ text = "0.56 0.11 0.096 0.11 0.12 0.1 0.61 0.091 0.097 0.096 0.091 0.089 0.59 0.
 
 values = [100 * float(t) for t in text.split()]
 matrix = np.array(values).reshape((5, 5))
-plot = sns.heatmap(matrix, annot=True, fmt=".1f", cmap='Blues', cbar=True, vmin=0, vmax=100, annot_kws={"size": 16})
+plot = sns.heatmap(matrix, annot=True, fmt=".1f", cmap='Blues', cbar=False, vmin=0, vmax=100, annot_kws={"size": 18}, xticklabels=list(range(1, 6)), yticklabels=list(range(1, 6)), square=True)
 
-title = "Joint + NMC"
+title = "Joint NMC"
 xlabel="Predicted task"
 ylabel="True task"
 
@@ -45,11 +45,12 @@ plot.set_title(title)
 plot.set_xlabel(xlabel)
 
 # Set sizes for text and ticks
-plot.set_xlabel(xlabel, fontsize=16)
-plot.set_ylabel(ylabel, fontsize=16)
-plot.set_title(title, fontsize=16)
-# plot.set_aspect('equal', adjustable='box')
+plot.set_xlabel(xlabel, fontsize=18)
+plot.set_ylabel(ylabel, fontsize=18)
+plot.set_title(title, fontsize=18)
+plt.xticks(fontsize=16)
+plt.yticks(fontsize=16)
 
 plt.tight_layout()
-plt.savefig(str(output_path_png))
-plt.savefig(str(output_path_pdf))
+plt.savefig(str(output_path_png), bbox_inches='tight', pad_inches=0)
+plt.savefig(str(output_path_pdf), bbox_inches='tight', pad_inches=0)
