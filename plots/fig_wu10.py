@@ -11,6 +11,7 @@ from constants import (
     NAME_FT,
     NAME_NMC_EX,
     NAME_NMC_FULL,
+    NAME_FT_WU,
     PLOT_LINEWIDTH,
     TEXT_FONTSIZE,
     TICK_FONTSIZE,
@@ -26,7 +27,7 @@ def parse_run(run, num_tasks):
     run_name = run.group
 
     # download all the values of 'cont_eval_acc_tag/t_0' from the run
-    metric_name = "test/avg_acc_tag"
+    metric_name = "cont_eval_acc_tag/t_0"
     cont_eval = run.history(keys=[("%s" % metric_name)], samples=100000)[metric_name]
     max_steps = len(cont_eval)
     steps_per_task = max_steps // num_tasks
@@ -34,7 +35,7 @@ def parse_run(run, num_tasks):
         {
             "run_name": run_name,
             "seed": seed,
-            "task": step+1,
+            "task": step / steps_per_task,
             "acc": acc,
         }
         for step, acc in enumerate(cont_eval)
@@ -50,15 +51,14 @@ def main():
     root = Path(__file__).parent
     output_dir = root / "plots"
     output_dir.mkdir(exist_ok=True, parents=True)
-    output_path_png = output_dir / "fig9_1.png"
-    output_path_pdf = output_dir / "fig9_1.pdf"
+    output_path_png = output_dir / "fig_wu10.png"
+    output_path_pdf = output_dir / "fig_wu10.pdf"
 
     # Filters for the runs
-    tag = "slca"
-    dataset = "aircrafts"
+    tag = "figure1"
+    dataset = "cifar100_icarl"
     num_tasks = 10
     nepochs = 100
-    exemplars = [2, 5, 10]
     approaches = ["ft_nmc", "finetuning"]
 
     # Get all runs for the plots from wandb server"
@@ -71,14 +71,10 @@ def main():
             "config.num_tasks": num_tasks,
             "config.nepochs": nepochs,
             "config.approach": {"$in": approaches},
-            "config.num_exemplars_per_class": {"$in": exemplars},
-            "config.slca": True,
-            "state": "finished",
+            "config.wu_nepochs": {"$in": [0, 20]},
         },
     )
     runs = list(runs)
-
-    print(len(runs))
 
     # Parse runs to plotting format
     parsed_runs = [
@@ -90,38 +86,10 @@ def main():
 
     # Set names for the legend
     name_dict = {
-        f"{dataset}_finetuning_t10s20_hz_m:2": "FT_2",
-        f"{dataset}_ft_nmc_t10s20_hz_m:2_up:1": "NMC_2",
-        f"{dataset}_finetuning_t10s20_hz_m:5": "FT_5",
-        f"{dataset}_ft_nmc_t10s20_hz_m:5_up:1": "NMC_5",
-        f"{dataset}_finetuning_t10s20_hz_m:10": "FT_10",
-        f"{dataset}_ft_nmc_t10s20_hz_m:10_up:1": "NMC_10",
+        "cifar100_icarl_finetuning_t10s10_hz_m:2000": NAME_FT,
+        "cifar100_icarl_finetuning_t10s10_wu_hz_wd:0.0_m:2000": NAME_FT_WU,
+        "cifar100_icarl_ft_nmc_t10s10_hz_m:2000_up:1": NAME_NMC_EX,
     }
-    hue_dict = {
-        "FT_2": 0,
-        "NMC_2": 3,
-        "FT_5": 1,
-        "NMC_5": 4,
-        "FT_10": 2,
-        "NMC_10": 5,
-    }
-    color_dict = {
-        "FT_2": "tab:red",
-        "NMC_2": "tab:red",
-        "FT_5": "tab:orange",
-        "NMC_5": "tab:orange",
-        "FT_10": "tab:blue",
-        "NMC_10": "tab:blue",
-    }
-    dashes_dict = {
-        "FT_2": (2, 0),
-        "NMC_2": (3, 3),
-        "FT_10": (2, 0),
-        "NMC_10": (3, 3),
-        "FT_5": (2, 0),
-        "NMC_5": (3, 3),
-    }
-
     df = df[df["run_name"].isin(name_dict.keys())]
     df["run_name"] = df["run_name"].map(name_dict)
 
@@ -132,26 +100,29 @@ def main():
 
     # Plot configuration
     xlabel = "Finished Task"
-    ylabel = "Average Accuracy"
-    title = "Aircrafts + SL | 10 tasks"
-    yticks = [20, 40, 60, 80, 100]
+    ylabel = "Task 1 Accuracy"
+    title = "CIFAR100 | 10 tasks"
+    yticks = [10, 20, 30, 40, 50, 60, 70]
+
+    hue = {
+        NAME_FT: 1,
+        NAME_NMC_EX: 2,
+        NAME_FT_WU: 3,
+    }
 
     plot = sns.lineplot(
         data=df,
         x="task",
         y="acc",
         hue="run_name",
-        palette=color_dict,
-        hue_order=hue_dict,
-        style="run_name",
-        dashes=dashes_dict,
-        linewidth=1,
+        palette=COLOR_PALETTE,
+        hue_order=hue,
+        linewidth=PLOT_LINEWIDTH,
     )
-
     plot.set_title(title)
     plot.set_xlabel(xlabel)
-    plt.xticks(range(1, num_tasks+1))
-    plot.set_xlim(1, num_tasks)
+    plt.xticks(range(num_tasks + 1))
+    plot.set_xlim(0, num_tasks)
     plot.set_ylabel(ylabel)
     # Set lower limit on y axis to 0
     plot.set_ylim(bottom=0)
@@ -167,29 +138,16 @@ def main():
     # Reorder labels and handles for the legneds
     handles, labels = plot.get_legend_handles_labels()
     handles = [
-        handles[labels.index("FT_2")],
-        handles[labels.index("NMC_2")],
-        handles[labels.index("FT_5")],
-        handles[labels.index("NMC_5")],
-        handles[labels.index("FT_10")],
-        handles[labels.index("NMC_10")],
-    ]
-    labels = [
-        "2 ex",
-        '+ NMC',
-        "5 ex",
-        '+ NMC',
-        "10 ex",
-        '+ NMC',
+        handles[labels.index(NAME_FT)],
+        handles[labels.index(NAME_NMC_EX)],
+        handles[labels.index(NAME_FT_WU)],
     ]
     plot.legend(
         handles=handles,
         labels=labels,
-        ncol=3,
-        fontsize=12,
+        loc="upper right",
+        fontsize=LEGEND_FONTSIZE,
         title=None,
-        loc="lower center",
-        handlelength=1.5
     )
 
     # Save figure

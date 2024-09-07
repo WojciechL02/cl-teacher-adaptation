@@ -63,13 +63,16 @@ def plot_cifar100x5(ax, xlabel, ylabel, legend=False):
             "config.datasets": [dataset],
             "config.num_tasks": num_tasks,
             "config.nepochs": nepochs,
-            "config.num_exemplars": 2000,
             "config.approach": {"$in": approaches},
             "state": "finished",
         },
     )
     runs = list(runs)
     print(len(runs))
+    # for r in runs:
+    #     if "best_prototypes" in r.config.keys():
+    #         if r.config["best_prototypes"] == True:
+    #             r.group += "_full_set_prot"
 
     # Parse runs to plotting format
     parsed_runs = [
@@ -82,7 +85,8 @@ def plot_cifar100x5(ax, xlabel, ylabel, legend=False):
     # Set names for the legend
     name_dict = {
         "cifar100_icarl_finetuning_t5s20_hz_m:2000": NAME_FT,
-        "cifar100_icarl_ft_nmc_t5s20_hz_m:2000_up:1_full_set_prot": NAME_NMC_FULL,
+        # "imagenet_subset_kaggle_ft_nmc_t5s20_hz_m:2000_up:1_full_set_prot": NAME_NMC_FULL,
+        "cifar100_icarl_ft_nmc_t5s20_hz_m:2000_up:1": NAME_NMC_EX,
     }
     # print(df)
     df = df[df["run_name"].isin(name_dict.keys())]
@@ -90,12 +94,7 @@ def plot_cifar100x5(ax, xlabel, ylabel, legend=False):
 
     # Plot configuration
     title = f"CIFAR100 | {num_tasks} tasks"
-    yticks = [10, 20, 30, 40, 50, 60, 70]
-
-    hue = {
-        NAME_FT: 1,
-        NAME_NMC_FULL: 2,
-    }
+    yticks = [10, 20, 30, 40, 50, 60]
 
     plot = sns.lineplot(
         data=df,
@@ -103,7 +102,7 @@ def plot_cifar100x5(ax, xlabel, ylabel, legend=False):
         y="acc",
         hue="run_name",
         palette=COLOR_PALETTE,
-        hue_order=hue,
+        hue_order=HUE_ORDER,
         linewidth=PLOT_LINEWIDTH,
         ax=ax,
         legend=False
@@ -122,21 +121,6 @@ def plot_cifar100x5(ax, xlabel, ylabel, legend=False):
     plot.set_xlabel(xlabel, fontsize=TEXT_FONTSIZE)
     plot.set_ylabel(ylabel, fontsize=TEXT_FONTSIZE)
     plot.set_title(title, fontsize=TEXT_FONTSIZE)
-
-    # # Remove legend title and set fontsize
-    # # Reorder labels and handles for the legneds
-    # handles, labels = plot.get_legend_handles_labels()
-    # handles = [
-    #     handles[labels.index(NAME_FT)],
-    #     handles[labels.index(NAME_NMC_FULL)],
-    # ]
-    # plot.legend(
-    #     handles=handles,
-    #     labels=labels,
-    #     loc="upper right",
-    #     fontsize=LEGEND_FONTSIZE,
-    #     title=None,
-    # )
 
 
 def plot_cifar100x10(ax, xlabel, ylabel, legend=False):
@@ -161,13 +145,16 @@ def plot_cifar100x10(ax, xlabel, ylabel, legend=False):
             "config.datasets": [dataset],
             "config.num_tasks": num_tasks,
             "config.nepochs": nepochs,
-            "config.num_exemplars": 2000,
             "config.approach": {"$in": approaches},
             "state": "finished",
         },
     )
     runs = list(runs)
     print(len(runs))
+    # for r in runs:
+    #     if "best_prototypes" in r.config.keys():
+    #         if r.config["best_prototypes"] == True:
+    #             r.group += "_full_set_prot"
 
     # Parse runs to plotting format
     parsed_runs = [
@@ -180,7 +167,8 @@ def plot_cifar100x10(ax, xlabel, ylabel, legend=False):
     # Set names for the legend
     name_dict = {
         "cifar100_icarl_finetuning_t10s10_hz_m:2000": NAME_FT,
-        "cifar100_icarl_ft_nmc_t10s10_hz_m:2000_up:1_full_set_prot": NAME_NMC_FULL,
+        # "imagenet_subset_kaggle_ft_nmc_t5s20_hz_m:2000_up:1_full_set_prot": NAME_NMC_FULL,
+        "cifar100_icarl_ft_nmc_t10s10_hz_m:2000_up:1": NAME_NMC_EX,
     }
     # print(df)
     df = df[df["run_name"].isin(name_dict.keys())]
@@ -190,18 +178,13 @@ def plot_cifar100x10(ax, xlabel, ylabel, legend=False):
     title = f"CIFAR100 | {num_tasks} tasks"
     yticks = [10, 20, 30, 40, 50, 60, 70]
 
-    hue = {
-        NAME_FT: 1,
-        NAME_NMC_FULL: 2,
-    }
-
     plot = sns.lineplot(
         data=df,
         x="task",
         y="acc",
         hue="run_name",
         palette=COLOR_PALETTE,
-        hue_order=hue,
+        hue_order=HUE_ORDER,
         linewidth=PLOT_LINEWIDTH,
         ax=ax,
         legend=False
@@ -220,21 +203,6 @@ def plot_cifar100x10(ax, xlabel, ylabel, legend=False):
     plot.set_xlabel(xlabel, fontsize=TEXT_FONTSIZE)
     plot.set_ylabel(ylabel, fontsize=TEXT_FONTSIZE)
     plot.set_title(title, fontsize=TEXT_FONTSIZE)
-
-    # # Remove legend title and set fontsize
-    # # Reorder labels and handles for the legneds
-    # handles, labels = plot.get_legend_handles_labels()
-    # handles = [
-    #     handles[labels.index(NAME_FT)],
-    #     handles[labels.index(NAME_NMC_FULL)],
-    # ]
-    # plot.legend(
-    #     handles=handles,
-    #     labels=labels,
-    #     loc="upper right",
-    #     fontsize=LEGEND_FONTSIZE,
-    #     title=None,
-    # )
 
 
 def plot_in5(ax, xlabel, ylabel, legend=False):
@@ -265,6 +233,10 @@ def plot_in5(ax, xlabel, ylabel, legend=False):
     )
     runs = list(runs)
     print(len(runs))
+    # for r in runs:
+    #     if "best_prototypes" in r.config.keys():
+    #         if r.config["best_prototypes"] == True:
+    #             r.group += "_full_set_prot"
 
     # Parse runs to plotting format
     parsed_runs = [
@@ -277,7 +249,8 @@ def plot_in5(ax, xlabel, ylabel, legend=False):
     # Set names for the legend
     name_dict = {
         "imagenet_subset_kaggle_finetuning_t5s20_hz_m:2000": NAME_FT,
-        "imagenet_subset_kaggle_ft_nmc_t5s20_hz_m:2000_up:1_full_set_prot": NAME_NMC_FULL,
+        # "imagenet_subset_kaggle_ft_nmc_t5s20_hz_m:2000_up:1_full_set_prot": NAME_NMC_FULL,
+        "imagenet_subset_kaggle_ft_nmc_t5s20_hz_m:2000_up:1": NAME_NMC_EX,
     }
     # print(df)
     df = df[df["run_name"].isin(name_dict.keys())]
@@ -287,18 +260,13 @@ def plot_in5(ax, xlabel, ylabel, legend=False):
     title = f"ImageNet100 | {num_tasks} tasks"
     yticks = [10, 20, 30, 40, 50, 60, 70, 80]
 
-    hue = {
-        NAME_FT: 1,
-        NAME_NMC_FULL: 2,
-    }
-
     plot = sns.lineplot(
         data=df,
         x="task",
         y="acc",
         hue="run_name",
         palette=COLOR_PALETTE,
-        hue_order=hue,
+        hue_order=HUE_ORDER,
         linewidth=PLOT_LINEWIDTH,
         ax=ax,
         legend=False
@@ -317,21 +285,6 @@ def plot_in5(ax, xlabel, ylabel, legend=False):
     plot.set_xlabel(xlabel, fontsize=TEXT_FONTSIZE)
     plot.set_ylabel(ylabel, fontsize=TEXT_FONTSIZE)
     plot.set_title(title, fontsize=TEXT_FONTSIZE)
-
-    # # Remove legend title and set fontsize
-    # # Reorder labels and handles for the legneds
-    # handles, labels = plot.get_legend_handles_labels()
-    # handles = [
-    #     handles[labels.index(NAME_FT)],
-    #     handles[labels.index(NAME_NMC_FULL)],
-    # ]
-    # plot.legend(
-    #     handles=handles,
-    #     labels=labels,
-    #     loc="upper right",
-    #     fontsize=LEGEND_FONTSIZE,
-    #     title=None,
-    # )
 
 
 def plot_in10(ax, xlabel, ylabel, legend=False):
@@ -362,10 +315,10 @@ def plot_in10(ax, xlabel, ylabel, legend=False):
     )
     runs = list(runs)
     print(len(runs))
-    for r in runs:
-        if "best_prototypes" in r.config.keys():
-            if r.config["best_prototypes"] == True:
-                r.group += "_full_set_prot"
+    # for r in runs:
+    #     if "best_prototypes" in r.config.keys():
+    #         if r.config["best_prototypes"] == True:
+    #             r.group += "_full_set_prot"
 
     # Parse runs to plotting format
     parsed_runs = [
@@ -378,7 +331,8 @@ def plot_in10(ax, xlabel, ylabel, legend=False):
     # Set names for the legend
     name_dict = {
         "imagenet_subset_kaggle_finetuning_t10s10_hz_m:2000": NAME_FT,
-        "imagenet_subset_kaggle_ft_nmc_t10s10_hz_m:2000_up:1_full_set_prot": NAME_NMC_FULL,
+        # "imagenet_subset_kaggle_ft_nmc_t5s20_hz_m:2000_up:1_full_set_prot": NAME_NMC_FULL,
+        "imagenet_subset_kaggle_ft_nmc_t10s10_hz_m:2000_up:1": NAME_NMC_EX,
     }
     # print(df)
     df = df[df["run_name"].isin(name_dict.keys())]
@@ -388,18 +342,13 @@ def plot_in10(ax, xlabel, ylabel, legend=False):
     title = f"ImageNet100 | {num_tasks} tasks"
     yticks = [10, 20, 30, 40, 50, 60, 70, 80, 90]
 
-    hue = {
-        NAME_FT: 1,
-        NAME_NMC_FULL: 2,
-    }
-
     plot = sns.lineplot(
         data=df,
         x="task",
         y="acc",
         hue="run_name",
         palette=COLOR_PALETTE,
-        hue_order=hue,
+        hue_order=HUE_ORDER,
         linewidth=PLOT_LINEWIDTH,
         ax=ax
     )
@@ -423,7 +372,7 @@ def plot_in10(ax, xlabel, ylabel, legend=False):
     handles, labels = plot.get_legend_handles_labels()
     handles = [
         handles[labels.index(NAME_FT)],
-        handles[labels.index(NAME_NMC_FULL)],
+        handles[labels.index(NAME_NMC_EX)],
     ]
     plot.legend(
         handles=handles,
@@ -439,15 +388,17 @@ def main():
     output_dir = root / "plots"
     output_dir.mkdir(exist_ok=True, parents=True)
 
-    fig, axes = plt.subplots(1, 4, figsize=(25.60, 4.80))  #, width_ratios=[1, 1, 1, 1]
+    fig, axes = plt.subplots(1, 4, figsize=(25.60, 4.80))  # , width_ratios=[1, 1, 1, 1]
+
+    os.environ['WANDB_API_KEY'] = '434fcc1957118a52a224c4d4a88db52186983f58'
 
     plot_cifar100x5(axes[0], xlabel="Finished Task", ylabel="Task 1 Accuracy")
     plot_cifar100x10(axes[1], xlabel="Finished Task", ylabel=None)
     plot_in5(axes[2], xlabel='Finished Task', ylabel=None)
     plot_in10(axes[3], xlabel='Finished Task', ylabel=None)
 
-    output_path_png = output_dir / "fig_merged_oracle.png"
-    output_path_pdf = output_dir / "fig_merged_oracle.pdf"
+    output_path_png = output_dir / "fig_merged_base.png"
+    output_path_pdf = output_dir / "fig_merged_base.pdf"
     plt.tight_layout()
     plt.savefig(str(output_path_png))
     plt.savefig(str(output_path_pdf))

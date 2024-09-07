@@ -11,6 +11,8 @@ from constants import (
     NAME_FT,
     NAME_NMC_EX,
     NAME_NMC_FULL,
+    NAME_JOINT,
+    NAME_JOINT_NMC,
     PLOT_LINEWIDTH,
     TEXT_FONTSIZE,
     TICK_FONTSIZE,
@@ -26,15 +28,15 @@ def parse_run(run, num_tasks):
     run_name = run.group
 
     # download all the values of 'cont_eval_acc_tag/t_0' from the run
-    metric_name = "test/avg_acc_tag"
+    metric_name = "cont_eval/task_recency_bias"
     cont_eval = run.history(keys=[("%s" % metric_name)], samples=100000)[metric_name]
     max_steps = len(cont_eval)
-    steps_per_task = max_steps // num_tasks
+    steps_per_task = max_steps // (num_tasks-1)
     return [
         {
             "run_name": run_name,
             "seed": seed,
-            "task": step+1,
+            "task": step / steps_per_task + 1,
             "acc": acc,
         }
         for step, acc in enumerate(cont_eval)
@@ -50,15 +52,14 @@ def main():
     root = Path(__file__).parent
     output_dir = root / "plots"
     output_dir.mkdir(exist_ok=True, parents=True)
-    output_path_png = output_dir / "fig9_1.png"
-    output_path_pdf = output_dir / "fig9_1.pdf"
+    output_path_png = output_dir / "fig_ltb5.png"
+    output_path_pdf = output_dir / "fig_ltb5.pdf"
 
     # Filters for the runs
-    tag = "slca"
-    dataset = "aircrafts"
-    num_tasks = 10
+    tag = "figure1"
+    dataset = "cifar100_icarl"
+    num_tasks = 5
     nepochs = 100
-    exemplars = [2, 5, 10]
     approaches = ["ft_nmc", "finetuning"]
 
     # Get all runs for the plots from wandb server"
@@ -66,18 +67,17 @@ def main():
     runs = api.runs(
         path=f"{wandb_entity}/{wandb_project}",
         filters={
-            "tags": tag,
+            # "tags": tag,
             "config.datasets": [dataset],
             "config.num_tasks": num_tasks,
             "config.nepochs": nepochs,
             "config.approach": {"$in": approaches},
-            "config.num_exemplars_per_class": {"$in": exemplars},
-            "config.slca": True,
             "state": "finished",
         },
     )
     runs = list(runs)
-
+    runs = [r for r in runs if "figure1" in r.tags or "joint" in r.tags]
+    runs = [r for r in runs if r.config["num_exemplars"] == 2000 or r.config["num_exemplars_per_class"] == 500]
     print(len(runs))
 
     # Parse runs to plotting format
@@ -90,38 +90,11 @@ def main():
 
     # Set names for the legend
     name_dict = {
-        f"{dataset}_finetuning_t10s20_hz_m:2": "FT_2",
-        f"{dataset}_ft_nmc_t10s20_hz_m:2_up:1": "NMC_2",
-        f"{dataset}_finetuning_t10s20_hz_m:5": "FT_5",
-        f"{dataset}_ft_nmc_t10s20_hz_m:5_up:1": "NMC_5",
-        f"{dataset}_finetuning_t10s20_hz_m:10": "FT_10",
-        f"{dataset}_ft_nmc_t10s20_hz_m:10_up:1": "NMC_10",
+        "cifar100_icarl_finetuning_t5s20_hz_m:2000": NAME_FT,
+        "cifar100_icarl_ft_nmc_t5s20_hz_m:2000_up:1": NAME_NMC_EX,
+        "cifar100_icarl_finetuning_t5s20_hz_m:500": NAME_JOINT,
+        "cifar100_icarl_ft_nmc_t5s20_hz_m:500_up:1": NAME_JOINT_NMC,
     }
-    hue_dict = {
-        "FT_2": 0,
-        "NMC_2": 3,
-        "FT_5": 1,
-        "NMC_5": 4,
-        "FT_10": 2,
-        "NMC_10": 5,
-    }
-    color_dict = {
-        "FT_2": "tab:red",
-        "NMC_2": "tab:red",
-        "FT_5": "tab:orange",
-        "NMC_5": "tab:orange",
-        "FT_10": "tab:blue",
-        "NMC_10": "tab:blue",
-    }
-    dashes_dict = {
-        "FT_2": (2, 0),
-        "NMC_2": (3, 3),
-        "FT_10": (2, 0),
-        "NMC_10": (3, 3),
-        "FT_5": (2, 0),
-        "NMC_5": (3, 3),
-    }
-
     df = df[df["run_name"].isin(name_dict.keys())]
     df["run_name"] = df["run_name"].map(name_dict)
 
@@ -132,22 +105,36 @@ def main():
 
     # Plot configuration
     xlabel = "Finished Task"
-    ylabel = "Average Accuracy"
-    title = "Aircrafts + SL | 10 tasks"
-    yticks = [20, 40, 60, 80, 100]
+    ylabel = "Latest Task Prediction Bias"
+    title = "CIFAR100 | 5 tasks"
+    yticks = [0.2, 0.4, 0.6, 0.8]
+
+    hue_order = {
+        NAME_FT: 1,
+        NAME_NMC_EX: 2,
+        NAME_JOINT: 3,
+        NAME_JOINT_NMC: 4,
+    }
+
+    dashes_dict = {
+        NAME_FT: (2, 0),
+        NAME_NMC_EX: (2, 0),
+        NAME_JOINT: (3, 3),
+        NAME_JOINT_NMC: (3, 3),
+        NAME_NMC_FULL: (2, 0),
+    }
 
     plot = sns.lineplot(
         data=df,
         x="task",
         y="acc",
         hue="run_name",
-        palette=color_dict,
-        hue_order=hue_dict,
+        palette=COLOR_PALETTE,
+        hue_order=hue_order,
         style="run_name",
         dashes=dashes_dict,
-        linewidth=1,
+        linewidth=PLOT_LINEWIDTH,
     )
-
     plot.set_title(title)
     plot.set_xlabel(xlabel)
     plt.xticks(range(1, num_tasks+1))
@@ -167,29 +154,17 @@ def main():
     # Reorder labels and handles for the legneds
     handles, labels = plot.get_legend_handles_labels()
     handles = [
-        handles[labels.index("FT_2")],
-        handles[labels.index("NMC_2")],
-        handles[labels.index("FT_5")],
-        handles[labels.index("NMC_5")],
-        handles[labels.index("FT_10")],
-        handles[labels.index("NMC_10")],
-    ]
-    labels = [
-        "2 ex",
-        '+ NMC',
-        "5 ex",
-        '+ NMC',
-        "10 ex",
-        '+ NMC',
+        handles[labels.index(NAME_FT)],
+        handles[labels.index(NAME_NMC_EX)],
+        handles[labels.index(NAME_JOINT)],
+        handles[labels.index(NAME_JOINT_NMC)],
     ]
     plot.legend(
         handles=handles,
         labels=labels,
-        ncol=3,
-        fontsize=12,
+        loc="upper left",
+        fontsize=LEGEND_FONTSIZE,
         title=None,
-        loc="lower center",
-        handlelength=1.5
     )
 
     # Save figure

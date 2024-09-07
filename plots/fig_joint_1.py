@@ -146,8 +146,8 @@ def main():
 
     # Save figure
     plt.tight_layout()
-    plt.savefig(str(output_path_png))
-    plt.savefig(str(output_path_pdf))
+    plt.savefig(str(output_path_png), bbox_inches='tight', pad_inches=0)
+    plt.savefig(str(output_path_pdf), bbox_inches='tight', pad_inches=0)
 
 
 if __name__ == "__main__":

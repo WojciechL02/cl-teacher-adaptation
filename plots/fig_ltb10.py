@@ -11,7 +11,8 @@ from constants import (
     NAME_FT,
     NAME_NMC_EX,
     NAME_NMC_FULL,
-    NAME_FT_WU,
+    NAME_JOINT,
+    NAME_JOINT_NMC,
     PLOT_LINEWIDTH,
     TEXT_FONTSIZE,
     TICK_FONTSIZE,
@@ -27,15 +28,15 @@ def parse_run(run, num_tasks):
     run_name = run.group
 
     # download all the values of 'cont_eval_acc_tag/t_0' from the run
-    metric_name = "cont_eval_acc_tag/t_0"
+    metric_name = "cont_eval/task_recency_bias"
     cont_eval = run.history(keys=[("%s" % metric_name)], samples=100000)[metric_name]
     max_steps = len(cont_eval)
-    steps_per_task = max_steps // num_tasks
+    steps_per_task = max_steps // (num_tasks-1)
     return [
         {
             "run_name": run_name,
             "seed": seed,
-            "task": step / steps_per_task,
+            "task": step / steps_per_task + 1,
             "acc": acc,
         }
         for step, acc in enumerate(cont_eval)
@@ -51,8 +52,8 @@ def main():
     root = Path(__file__).parent
     output_dir = root / "plots"
     output_dir.mkdir(exist_ok=True, parents=True)
-    output_path_png = output_dir / "fig_wu.png"
-    output_path_pdf = output_dir / "fig_wu.pdf"
+    output_path_png = output_dir / "fig_ltb10.png"
+    output_path_pdf = output_dir / "fig_ltb10.pdf"
 
     # Filters for the runs
     tag = "figure1"
@@ -66,14 +67,20 @@ def main():
     runs = api.runs(
         path=f"{wandb_entity}/{wandb_project}",
         filters={
-            "tags": tag,
+            # "tags": tag,
             "config.datasets": [dataset],
             "config.num_tasks": num_tasks,
             "config.nepochs": nepochs,
             "config.approach": {"$in": approaches},
+            "state": "finished",
         },
     )
     runs = list(runs)
+    runs = [r for r in runs if "figure1" in r.tags or "joint" in r.tags]
+    runs = [r for r in runs if r.config["num_exemplars"] == 2000 or r.config["num_exemplars_per_class"] == 500]
+    groups = ["cifar100_icarl_finetuning_t10s10_hz_m:2000", "cifar100_icarl_ft_nmc_t10s10_hz_m:2000_up:1", "cifar100_icarl_finetuning_t10s10_hz_m:500", "cifar100_icarl_ft_nmc_t10s10_hz_m:500_up:1"]
+    runs = [r for r in runs if r.group in groups]
+    print(len(runs))
 
     # Parse runs to plotting format
     parsed_runs = [
@@ -86,8 +93,9 @@ def main():
     # Set names for the legend
     name_dict = {
         "cifar100_icarl_finetuning_t10s10_hz_m:2000": NAME_FT,
-        "cifar100_icarl_finetuning_t10s10_wu_hz_wd:0.0_m:2000": NAME_FT_WU,
         "cifar100_icarl_ft_nmc_t10s10_hz_m:2000_up:1": NAME_NMC_EX,
+        "cifar100_icarl_finetuning_t10s10_hz_m:500": NAME_JOINT,
+        "cifar100_icarl_ft_nmc_t10s10_hz_m:500_up:1": NAME_JOINT_NMC,
     }
     df = df[df["run_name"].isin(name_dict.keys())]
     df["run_name"] = df["run_name"].map(name_dict)
@@ -99,14 +107,23 @@ def main():
 
     # Plot configuration
     xlabel = "Finished Task"
-    ylabel = "Task 1 Accuracy"
+    ylabel = "Latest Task Prediction Bias"
     title = "CIFAR100 | 10 tasks"
-    yticks = [10, 20, 30, 40, 50, 60, 70]
+    yticks = [0.2, 0.4, 0.6, 0.8]
 
-    hue = {
+    hue_order = {
         NAME_FT: 1,
         NAME_NMC_EX: 2,
-        NAME_FT_WU: 3,
+        NAME_JOINT: 3,
+        NAME_JOINT_NMC: 4,
+    }
+
+    dashes_dict = {
+        NAME_FT: (2, 0),
+        NAME_NMC_EX: (2, 0),
+        NAME_JOINT: (3, 3),
+        NAME_JOINT_NMC: (3, 3),
+        NAME_NMC_FULL: (2, 0),
     }
 
     plot = sns.lineplot(
@@ -115,13 +132,15 @@ def main():
         y="acc",
         hue="run_name",
         palette=COLOR_PALETTE,
-        hue_order=hue,
+        hue_order=hue_order,
+        style="run_name",
+        dashes=dashes_dict,
         linewidth=PLOT_LINEWIDTH,
     )
     plot.set_title(title)
     plot.set_xlabel(xlabel)
-    plt.xticks(range(num_tasks + 1))
-    plot.set_xlim(0, num_tasks)
+    plt.xticks(range(1, num_tasks+1))
+    plot.set_xlim(1, num_tasks)
     plot.set_ylabel(ylabel)
     # Set lower limit on y axis to 0
     plot.set_ylim(bottom=0)
@@ -139,20 +158,21 @@ def main():
     handles = [
         handles[labels.index(NAME_FT)],
         handles[labels.index(NAME_NMC_EX)],
-        handles[labels.index(NAME_FT_WU)],
+        handles[labels.index(NAME_JOINT)],
+        handles[labels.index(NAME_JOINT_NMC)],
     ]
     plot.legend(
         handles=handles,
         labels=labels,
-        loc="upper right",
+        # loc="upper left",
         fontsize=LEGEND_FONTSIZE,
         title=None,
     )
 
     # Save figure
     plt.tight_layout()
-    plt.savefig(str(output_path_png))
-    plt.savefig(str(output_path_pdf))
+    plt.savefig(str(output_path_png), bbox_inches='tight', pad_inches=0)
+    plt.savefig(str(output_path_pdf), bbox_inches='tight', pad_inches=0)
 
 
 if __name__ == "__main__":
