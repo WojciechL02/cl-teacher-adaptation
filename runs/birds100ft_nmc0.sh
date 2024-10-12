@@ -23,6 +23,7 @@ exemplars=10
 head_init=zeros
 
 # for seed in 0 1 2; do
+./experiments/ft_nmc_pretr.sh 0 0 ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${lr} ${head_init} ${stop_at_task} 1 ${exemplars} ${bsz}
 ./experiments/ft_nmc_pretr.sh 0 1 ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${lr} ${head_init} ${stop_at_task} 1 ${exemplars} ${bsz}
 ./experiments/ft_nmc_pretr.sh 0 2 ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${lr} ${head_init} ${stop_at_task} 1 ${exemplars} ${bsz}
 # ./experiments/ft_nmc.sh 0 0 ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} 100 0.1 ${head_init} ${stop_at_task} 0 2000 &
