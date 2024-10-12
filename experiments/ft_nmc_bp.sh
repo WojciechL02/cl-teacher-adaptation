@@ -19,7 +19,7 @@ bsz=${14:-128}
 
 
 if [ ${update_prototypes} -gt 0 ]; then
-    exp_name="t${num_tasks}s${nc_first_task}_hz_m:${exemplars}_up:${update_prototypes}"
+    exp_name="t${num_tasks}s${nc_first_task}_hz_m:${exemplars}_up:${update_prototypes}_full_set_prot"
     result_path="results/${tag}/ft_nmc_hz_${seed}"
     python3 src/main_incremental.py \
     --exp-name ${exp_name} \
@@ -36,6 +36,7 @@ if [ ${update_prototypes} -gt 0 ]; then
     --log disk wandb \
     --results-path ${result_path} \
     --tags ${tag} \
+    --cm \
     --scheduler-milestones \
     --stop-at-task ${stop_at_task} \
     --approach ft_nmc \
@@ -61,6 +62,7 @@ else
     --log disk wandb \
     --results-path ${result_path} \
     --tags ${tag} \
+    --cm \
     --scheduler-milestones \
     --stop-at-task ${stop_at_task} \
     --approach ft_nmc \

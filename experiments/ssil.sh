@@ -36,6 +36,7 @@ if [ ${wu_epochs} -gt 0 ]; then
     --log disk wandb \
     --results-path ${result_path} \
     --tags ${tag} \
+    --cm \
     --scheduler-milestones \
     --approach ssil \
     --stop-at-task ${stop_at_task} \
@@ -45,7 +46,8 @@ if [ ${wu_epochs} -gt 0 ]; then
     --wu-wd ${wu_wd} \
     --wu-fix-bn \
     --wu-scheduler cosine \
-    --head-init-mode ${head_init}
+    --head-init-mode ${head_init} \
+    --num-exemplars 2000
 else
   exp_name="cifar100t${num_tasks}s${nc_first_task}_${tag}_hz_lamb_${lamb}_lr:${lr}"
   result_path="results/${tag}/lwf_hz_${lamb}_${seed}"
@@ -64,6 +66,7 @@ else
     --log disk wandb \
     --results-path ${result_path} \
     --tags ${tag} \
+    --cm \
     --scheduler-milestones \
     --approach ssil \
     --stop-at-task ${stop_at_task} \

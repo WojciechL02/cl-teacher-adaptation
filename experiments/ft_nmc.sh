@@ -36,6 +36,7 @@ if [ ${update_prototypes} -gt 0 ]; then
     --log disk wandb \
     --results-path ${result_path} \
     --tags ${tag} \
+    --cm \
     --scheduler-milestones \
     --stop-at-task ${stop_at_task} \
     --approach ft_nmc \
@@ -60,6 +61,7 @@ else
     --log disk wandb \
     --results-path ${result_path} \
     --tags ${tag} \
+    --cm \
     --scheduler-milestones \
     --stop-at-task ${stop_at_task} \
     --approach ft_nmc \

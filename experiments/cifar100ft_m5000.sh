@@ -16,14 +16,15 @@ dataset=cifar100_icarl
 network=resnet18
 tag=figure1  # experiment name
 
-lamb=1
 num_epochs=100
-lr=0.05
+lr=0.1
+bsz=128
 wu_lr=0.1
+exemplars=50
 head_init=zeros
 
-#without warm-up:
+# without warm-up:
 for seed in 0 1 2; do
-  ./experiments/ssil.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${lamb} 0 0 0.0 ${lr} ${head_init} ${stop_at_task} &
+  ./experiments/ft2.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} 0 0 0.0 ${lr} ${head_init} ${stop_at_task} ${exemplars} ${bsz} &
 done
 wait

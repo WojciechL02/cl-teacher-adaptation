@@ -9,21 +9,24 @@ set -e
 eval "$(conda shell.bash hook)"
 conda activate FACIL
 
-num_tasks=10
-nc_first_task=10
+num_tasks=5
+nc_first_task=20
 stop_at_task=0  # default = 0
 dataset=cifar100_icarl
 network=resnet18
 tag=figure1  # experiment name
 
-lamb=1
 num_epochs=100
-lr=0.05
-wu_lr=0.1
+lr=0.1
+bsz=128
+wu_epochs=50
+wu_lr=0.2
+wu_wd=0.0
+exemplars=2000
 head_init=zeros
 
-#without warm-up:
+# without warm-up:
 for seed in 0 1 2; do
-  ./experiments/ssil.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${lamb} 0 0 0.0 ${lr} ${head_init} ${stop_at_task} &
+  ./experiments/ft2.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${wu_epochs} ${wu_lr} ${wu_wd} ${lr} ${head_init} ${stop_at_task} ${exemplars} ${bsz} &
 done
 wait
