@@ -98,7 +98,7 @@ def main(argv=None):
                         help='Mode of new head weights initialization (default=%(default)s)')
     parser.add_argument('--pretrained', action='store_true',
                         help='Use pretrained backbone (default=%(default)s)')
-    parser.add_argument('--projector-type', default="wang", type=str, required=False, choices=["wang", "lin"],
+    parser.add_argument('--projector-type', default="mlp", type=str, required=False, choices=["mlp", "linear"],
                         help='Use pretrained backbone (default=%(default)s)')
     # training args
     parser.add_argument('--approach', default='finetuning', type=str, choices=approach.__all__,

@@ -4,20 +4,23 @@ from .network import LLL_Net
 
 
 class SSL_Net(LLL_Net):
-    def __init__(self, model, remove_existing_head=True, head_init_mode=None, projector_type="wang"):
+    def __init__(self, model, remove_existing_head=True, head_init_mode=None, projector_type="mlp"):
         """Class implementing a network for Contrastive Learning approaches."""
         super(SSL_Net, self).__init__(model, remove_existing_head=True, head_init_mode=head_init_mode)
 
         self.projector = self._init_projector(projector_type)
 
     def _init_projector(self, projector_type: str):
-        if projector_type == "wang":
+        if projector_type == "mlp":
             return nn.Sequential(
-                        nn.Linear(self.out_size, 2 * self.out_size),
-                        nn.BatchNorm1d(2 * self.out_size),
+                        nn.Linear(self.out_size, self.out_size // 2),
+                        nn.BatchNorm1d(self.out_size // 2),
                         nn.ReLU(),
-                        nn.Linear(2 * self.out_size, self.out_size)
+                        nn.Linear(self.out_size // 2, self.out_size // 4)
                     )
+        elif projector_type == "linear":
+            return nn.Linear(self.out_size, self.out_size // 4)
+
         raise ValueError(f"Projector: {projector_type} not supported.")
 
     # def add_head(self, num_outputs):
@@ -37,9 +40,9 @@ class SSL_Net(LLL_Net):
             return_features (bool): return the representations before the projector
         """
         x = self.model(x)
-        # x = torch.nn.functional.normalize(x, dim=1)
 
-        y = self.projector(x)
+        y = torch.nn.functional.normalize(x, dim=1)
+        y = self.projector(y)
         y = torch.nn.functional.normalize(y, dim=1)
 
         if return_features:
