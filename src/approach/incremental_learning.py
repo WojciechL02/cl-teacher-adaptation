@@ -327,13 +327,13 @@ class Inc_Learning_Appr:
                     outputs, feats = self.model(images, return_features=True)
 
                     if task_id == t:
-                        loss = self.criterion(t, outputs, targets)
+                        loss = self.criterion(task_id, outputs, targets)
                         total_loss_curr += loss.item() * len(targets)
                         total_num_curr += total_num
 
                     outputs_stacked = torch.stack(outputs, dim=1)
                     shape = outputs_stacked.shape
-                    hits_taw, hits_tag, outputs = self.classifier.classify(t, outputs, feats, targets, return_dists=True)
+                    hits_taw, hits_tag, outputs = self.classifier.classify(task_id, outputs, feats, targets, return_dists=True)
                     # Log
                     total_acc_tag += hits_tag.sum().data.cpu().numpy().item()
                     total_acc_taw += hits_taw.sum().data.cpu().numpy().item()
