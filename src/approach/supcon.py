@@ -1,23 +1,16 @@
 import torch
 import warnings
-import numpy as np
-from copy import deepcopy
 from argparse import ArgumentParser
-from torch.utils.data import DataLoader
-import torch.nn.functional as F
-from torchvision import transforms
 from collections import Counter
 
 from .incremental_learning import Inc_Learning_Appr
 from .loss_func.supcon_loss import SupConLoss
 from datasets.exemplars_dataset import ExemplarsDataset
-from datasets.exemplars_selection import override_dataset_transform
 
 
 class Appr(Inc_Learning_Appr):
-    """Class implementing the Incremental Classifier and Representation Learning (iCaRL) approach
-    described in https://arxiv.org/abs/1611.07725
-    Original code available at https://github.com/srebuffi/iCaRL
+    """Class implementing the Supervised Contrastive Replay approach based on SupCon loss
+    described in https://arxiv.org/abs/2004.11362
     """
 
     def __init__(self, model, device, classifier="nmc", nepochs=60, lr=0.5, lr_min=1e-4, lr_factor=3, lr_patience=5, clipgrad=10000,
@@ -30,14 +23,6 @@ class Appr(Inc_Learning_Appr):
                                    scheduler_milestones, slca=slca)
         if classifier != "nmc":
             raise ValueError("Only NMC is supported in Contrastive Learning approaches.")
-
-        # color_jitter = transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
-        # self.trn_transforms = transforms.Compose([
-        #     transforms.RandomHorizontalFlip(),
-        #     transforms.RandomApply([color_jitter], p=0.8),
-        #     transforms.RandomGrayscale(p=0.2),
-        #     transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
-        # ])
 
         self.loss_func = SupConLoss(temperature)
 
@@ -86,7 +71,7 @@ class Appr(Inc_Learning_Appr):
 
         # compute mean of exemplars on every epoch
         self.classifier.prototypes_update(t, trn_loader, self.val_loader_transform)
-    
+
     def train_loop(self, t, trn_loader, val_loader):
         """Contains the epochs loop"""
 
@@ -125,7 +110,7 @@ class Appr(Inc_Learning_Appr):
                 total_num += len(targets)
         return total_loss / total_num, total_acc_taw / total_num, total_acc_tag / total_num
 
-    def criterion(self, t, outputs, targets, outputs_new=None, outputs_old=None):
+    def criterion(self, t, outputs, targets):
         """Returns the loss value"""
         return self.loss_func(outputs, targets)
 
@@ -149,28 +134,29 @@ class Appr(Inc_Learning_Appr):
                 for images, targets in loader:
                     images, targets = images.to(self.device), targets.to(self.device)
                     # Forward current model
-                    outputs, feats = self.model(images, return_features=True)
-                    features = torch.cat([feats.unsqueeze(1), feats.unsqueeze(1)], dim=1)
+                    _, feats = self.model(images, return_features=True)
+                    # features = torch.cat([feats.unsqueeze(1), feats.unsqueeze(1)], dim=1)
 
                     if task_id == t:
-                        loss = self.criterion(t, features, targets)
-                        total_loss_curr += loss.item() * len(targets)
+                        # loss = self.criterion(t, features, targets)
+                        # total_loss_curr += loss.item() * len(targets)
+                        total_loss_curr += 0
                         total_num_curr += total_num
 
                     # outputs_stacked = torch.stack(outputs, dim=1)
                     # shape = outputs_stacked.shape
-                    # hits_taw, hits_tag, outputs = self.classifier.classify(t, outputs, feats, targets, return_dists=True)
+                    hits_taw, hits_tag, outputs = self.classifier.classify(task_id, [], feats, targets, return_dists=True)
+
                     # # Log
-                    # total_acc_tag += hits_tag.sum().data.cpu().numpy().item()
-                    # total_acc_taw += hits_taw.sum().data.cpu().numpy().item()
-                    # total_num += len(targets)
-                    total_num += 10
+                    total_acc_tag += hits_tag.sum().data.cpu().numpy().item()
+                    total_acc_taw += hits_taw.sum().data.cpu().numpy().item()
+                    total_num += len(targets)
 
                     ### TO JEST DO ROZWAŻENIA ######################
-                    # outputs = outputs.view(shape[0], shape[1], shape[2])
-                    # outputs = torch.min(outputs, dim=-1)[0]
-                    # outputs = outputs.argmin(dim=-1)
-                    # task_ids.extend(outputs.tolist())
+                    outputs = outputs.view(images.shape[0], len(self.model.task_cls), self.model.task_cls[0])
+                    outputs = torch.min(outputs, dim=-1)[0]
+                    outputs = outputs.argmin(dim=-1)
+                    task_ids.extend(outputs.tolist())
                     ###############################################
 
                 counts = Counter(task_ids)
