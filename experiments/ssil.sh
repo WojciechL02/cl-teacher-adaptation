@@ -72,5 +72,6 @@ else
     --stop-at-task ${stop_at_task} \
     --lamb ${lamb} \
     --head-init-mode ${head_init} \
-    --num-exemplars 2000
+    --num-exemplars 2000 \
+    --classifier nmc
 fi
