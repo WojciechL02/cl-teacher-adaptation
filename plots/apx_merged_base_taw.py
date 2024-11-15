@@ -25,8 +25,8 @@ def parse_run(run, num_tasks):
     seed = run.config["seed"]
     run_name = run.group
 
-    # download all the values of 'cont_eval_acc_tag/t_0' from the run
-    metric_name = "cont_eval_acc_tag/t_0"
+    # download all the values of 'cont_eval_acc_taw/t_0' from the run
+    metric_name = "cont_eval_acc_taw/t_0"
     cont_eval = run.history(keys=[("%s" % metric_name)], samples=100000)[metric_name]
     max_steps = len(cont_eval)
     steps_per_task = max_steps // num_tasks
@@ -370,7 +370,6 @@ def plot_in10(ax, xlabel, ylabel, legend=False):
     # Remove legend title and set fontsize
     # Reorder labels and handles for the legneds
     handles, labels = plot.get_legend_handles_labels()
-    print(labels)
     handles = [
         handles[labels.index(NAME_FT)],
         handles[labels.index(NAME_NMC_EX)],
@@ -378,7 +377,7 @@ def plot_in10(ax, xlabel, ylabel, legend=False):
     plot.legend(
         handles=handles,
         labels=labels,
-        loc="upper right",
+        loc="lower right",
         fontsize=LEGEND_FONTSIZE,
         title=None,
     )
@@ -398,11 +397,11 @@ def main():
     plot_in5(axes[2], xlabel='Finished Task', ylabel=None)
     plot_in10(axes[3], xlabel='Finished Task', ylabel=None)
 
-    # output_path_png = output_dir / "fig_merged_base.png"
-    # output_path_pdf = output_dir / "fig_merged_base.pdf"
-    # plt.tight_layout()
-    # plt.savefig(str(output_path_png))
-    # plt.savefig(str(output_path_pdf))
+    output_path_png = output_dir / "apx_merged_base_taw.png"
+    output_path_pdf = output_dir / "apx_merged_base_taw.pdf"
+    plt.tight_layout()
+    plt.savefig(str(output_path_png))
+    plt.savefig(str(output_path_pdf))
 
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@ NAME_NMC_EX = "NMC"
 NAME_JOINT = "Joint"
 NAME_JOINT_NMC = "Joint NMC"
 NAME_FT_WU = "Finetuning + WU"
+NAME_LIN = "Linear"
 
 COLOR_PALETTE = {
     NAME_FT: "tab:red",
@@ -12,6 +13,7 @@ COLOR_PALETTE = {
     NAME_JOINT: "tab:red",
     NAME_JOINT_NMC: "tab:blue",
     NAME_FT_WU: "tab:gray",
+    NAME_LIN: "tab:red",
 }
 HUE_ORDER = {
     NAME_FT: 1,
@@ -19,7 +21,8 @@ HUE_ORDER = {
     NAME_NMC_FULL: 3,
     NAME_JOINT: 4,
     NAME_JOINT_NMC: 5,
-    NAME_FT_WU: 6
+    NAME_FT_WU: 6,
+    NAME_LIN: 7,
 }
 PLOT_LINEWIDTH = 1
 TICK_FONTSIZE = 16
