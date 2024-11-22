@@ -11,6 +11,7 @@ from loggers.exp_logger import ExperimentLogger
 from datasets.exemplars_dataset import ExemplarsDataset
 from .classifiers.classifier_factory import ClassifierFactory
 from .classifiers.nmc import NMC
+from .classifiers.knn import KNN
 
 
 class Inc_Learning_Appr:
@@ -339,17 +340,8 @@ class Inc_Learning_Appr:
                     total_acc_taw += hits_taw.sum().data.cpu().numpy().item()
                     total_num += len(targets)
 
-                    ### TO JEST DO ROZWAŻENIA ######################
-                    if isinstance(self.classifier, NMC):
-                        outputs = outputs.view(shape[0], shape[1], shape[2])
-                        outputs = torch.min(outputs, dim=-1)[0]
-                        outputs = outputs.argmin(dim=-1)
-                        task_ids.extend(outputs.tolist())
-                    else:
-                        outputs = torch.stack(outputs, dim=1)
-                        outputs = torch.max(outputs, dim=-1)[0]
-                        task_ids.extend(outputs.argmax(dim=-1).tolist())
-                    ###############################################
+                    curr_data_task_ids = self.classifier.get_task_ids(outputs, shape)
+                    task_ids.extend(curr_data_task_ids)
 
                 counts = Counter(task_ids)
                 for j, val in counts.items():

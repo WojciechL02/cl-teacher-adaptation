@@ -118,3 +118,9 @@ class NMC(Classifier):
             if t > 0:
                 self.compute_mean_of_exemplars(trn_loader, transform)
             self.compute_means_of_current_classes(trn_loader, transform)
+
+    def get_task_ids(self, outputs, stacked_shape):
+        outputs = outputs.view(stacked_shape[0], stacked_shape[1], stacked_shape[2])
+        outputs = torch.min(outputs, dim=-1)[0]
+        outputs = outputs.argmin(dim=-1)
+        return outputs.tolist()

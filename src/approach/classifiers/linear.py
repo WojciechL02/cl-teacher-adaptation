@@ -40,3 +40,8 @@ class LinearClassifier(Classifier):
         if return_dists:
             return hits_taw, hits_tag, outputs
         return hits_taw, hits_tag
+
+    def get_task_ids(self, outputs, stacked_shape):
+        outputs = torch.stack(outputs, dim=1)
+        outputs = torch.max(outputs, dim=-1)[0]
+        return outputs.argmax(dim=-1).tolist()
