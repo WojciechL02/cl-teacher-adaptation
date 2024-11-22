@@ -44,12 +44,12 @@ def parse_run(run, num_tasks, metric_name):
 
     cont_eval = run.history(keys=[("%s" % metric_name)], samples=100000)[metric_name]
     max_steps = len(cont_eval)
-    steps_per_task = max_steps // num_tasks
+    steps_per_task = max_steps // (num_tasks-1)
     return [
         {
             "run_name": run_name,
             "seed": seed,
-            "task": step / steps_per_task,
+            "task": step / steps_per_task + 1,
             "acc": acc,
         }
         for step, acc in enumerate(cont_eval)
@@ -211,8 +211,8 @@ def plot_wc(ax, xlabel, ylabel, legend=False):
 
     plot.set_title(title)
     plot.set_xlabel(xlabel)
-    plot.set_xticks(range(num_tasks + 1))
-    plot.set_xlim(0, num_tasks)
+    plot.set_xticks(range(1, num_tasks + 1))
+    plot.set_xlim(1, num_tasks)
     plot.set_ylabel(ylabel)
     # Set lower limit on y axis to 0
     plot.set_ylim(bottom=0)
@@ -296,8 +296,8 @@ def plot_min(ax, xlabel, ylabel, legend=False):
 
     plot.set_title(title)
     plot.set_xlabel(xlabel)
-    plot.set_xticks(range(num_tasks + 1))
-    plot.set_xlim(0, num_tasks)
+    plot.set_xticks(range(1, num_tasks + 1))
+    plot.set_xlim(1, num_tasks)
     plot.set_ylabel(ylabel)
     # Set lower limit on y axis to 0
     plot.set_ylim(bottom=0)
