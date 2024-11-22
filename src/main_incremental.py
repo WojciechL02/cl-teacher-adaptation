@@ -145,7 +145,7 @@ def main(argv=None):
                         help='Additional data augmentations (default=%(default)s)')
     parser.add_argument('--reset-backbone', action='store_true',
                         help='Reset backbone weights between tasks ((default=%(default)s))')
-    parser.add_argument('--classifier', default="linear", required=False, choices=['linear', 'nmc'],
+    parser.add_argument('--classifier', default="linear", required=False, choices=['linear', 'nmc', 'knn'],
                         help='Classification head strategy (default=%(default)s)')
     parser.add_argument('--best_prototypes', action='store_true',
                         help='Calculate prototypes on full trainset (default=%(default)s)')
