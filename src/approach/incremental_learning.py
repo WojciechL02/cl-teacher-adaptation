@@ -1,21 +1,27 @@
 import time
 from copy import deepcopy
+from collections import Counter
 import torch
 import numpy as np
 from argparse import ArgumentParser
+import umap
+import pandas as pd
 
 from loggers.exp_logger import ExperimentLogger
 from datasets.exemplars_dataset import ExemplarsDataset
+from .classifiers.classifier_factory import ClassifierFactory
+from .classifiers.nmc import NMC
+from .classifiers.knn import KNN
 
 
 class Inc_Learning_Appr:
     """Basic class for implementing incremental learning approaches"""
 
-    def __init__(self, model, device, nepochs=100, lr=0.05, lr_min=1e-4, lr_factor=3, lr_patience=5, clipgrad=10000,
+    def __init__(self, model, device, classifier="linear", nepochs=100, lr=0.05, lr_min=1e-4, lr_factor=3, lr_patience=5, clipgrad=10000,
                  momentum=0, wd=0, multi_softmax=False, wu_nepochs=0, wu_lr=1e-1, wu_fix_bn=False,
                  wu_scheduler='constant', wu_patience=None, wu_wd=0., fix_bn=False,
                  eval_on_train=False, select_best_model_by_val_loss=True, logger: ExperimentLogger = None,
-                 exemplars_dataset: ExemplarsDataset = None, scheduler_milestones=False, no_learning=False):
+                 exemplars_dataset: ExemplarsDataset = None, scheduler_type=False, no_learning=False, log_grad_norm=True, best_prototypes=False, slca=False):
         self.model = model
         self.device = device
         self.nepochs = nepochs
@@ -40,12 +46,17 @@ class Inc_Learning_Appr:
         self.eval_on_train = eval_on_train
         self.select_best_model_by_val_loss = select_best_model_by_val_loss
         self.optimizer = None
-        self.scheduler_milestones = scheduler_milestones
+        self.scheduler_type = scheduler_type
         self.scheduler = None
         self.debug = False
         self.no_learning = no_learning
+        self.classifier = ClassifierFactory.create_classifier(classifier, device, self.model, self.exemplars_dataset, best_prototypes, multi_softmax)
+        self.val_loader_transform = None
 
-        self.last_e_accs = None # variable for stability-gap metric
+        self.last_e_accs = None  # variable for stability-gap metric
+        self.log_grad_norm = False
+        self.projector = None  # UMAP
+        self.slca = slca
 
     @staticmethod
     def extra_parser(args):
@@ -62,14 +73,46 @@ class Inc_Learning_Appr:
 
     def _get_optimizer(self):
         """Returns the optimizer"""
+        if self.slca:  # and len(self.model.heads) > 1:
+            backbone_params = {'params': self.model.model.parameters(), 'lr': self.lr * 0.1}
+            head_params = {'params': self.model.heads.parameters()}
+            network_params = [backbone_params, head_params]
+            return torch.optim.SGD(network_params, lr=self.lr, weight_decay=self.wd, momentum=self.momentum)
         return torch.optim.SGD(self.model.parameters(), lr=self.lr, weight_decay=self.wd, momentum=self.momentum)
+        # return torch.optim.AdamW(self.model.parameters(), lr=self.lr, weight_decay=self.wd)
 
     def _get_scheduler(self):
-        if self.scheduler_milestones:
+        if self.scheduler_type == "linear":
             # return torch.optim.lr_scheduler.MultiStepLR(optimizer=self.optimizer, milestones=self.scheduler_milestones, gamma=0.1)
             return torch.optim.lr_scheduler.LinearLR(optimizer=self.optimizer, start_factor=1.0, end_factor=0.01, total_iters=self.nepochs)
+        elif self.scheduler_type == "cosine":
+            return torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=self.optimizer, T_max=self.nepochs, eta_min=self.lr*0.01)
         else:
             return None
+
+    def get_embeddings(self, t):
+        loaders = self.tst_loader[:t + 1]
+        self.model.eval()
+        labels = []
+        embed_list = []
+        with torch.no_grad():
+            for i, loader in enumerate(loaders):
+                for images, targets in loader:
+                    images, targets = images.to(self.device), targets.to(self.device)
+                    outputs = self.model.model(images)  # get only backbone results
+                    embed_list.append(outputs)
+                    labels.append(targets)
+        return torch.cat(embed_list, dim=0), torch.cat(labels, dim=0)
+    
+    def project_latent_space(self, embeddings, labels):
+        if self.projector is None:
+            self.projector = umap.UMAP(metric="euclidean", n_neighbors=50)
+            projected = self.projector.fit_transform(embeddings.cpu())
+        else:
+            projected = self.projector.transform(embeddings.cpu())
+        data = pd.DataFrame(projected)
+        data["label"] = labels.cpu()
+        return data
 
     def train(self, t, trn_loader, val_loader):
         """Main train structure"""
@@ -117,7 +160,8 @@ class Inc_Learning_Appr:
             best_loss = float('inf')
             best_model = self.model.state_dict()
 
-            new_trn_loader = torch.utils.data.DataLoader(trn_loader.dataset, batch_size=512, shuffle=True, num_workers=trn_loader.num_workers, pin_memory=trn_loader.pin_memory)
+            # loader with bigger batch size for more stable warmup
+            # new_trn_loader = torch.utils.data.DataLoader(trn_loader.dataset, batch_size=512, shuffle=True, num_workers=trn_loader.num_workers, pin_memory=trn_loader.pin_memory)
 
             # Loop epochs -- train warm-up head
             for e in range(self.warmup_epochs):
@@ -129,7 +173,7 @@ class Inc_Learning_Appr:
                     self.model.train()
                 self.model.heads[-1].train()
 
-                for images, targets in new_trn_loader:
+                for images, targets in trn_loader:
                     images = images.to(self.device, non_blocking=True)
                     targets = targets.to(self.device, non_blocking=True)
 
@@ -145,7 +189,7 @@ class Inc_Learning_Appr:
                 with torch.no_grad():
                     total_loss, total_acc_taw = 0, 0
                     self.model.eval()
-                    for images, targets in new_trn_loader:
+                    for images, targets in trn_loader:
                         images, targets = images.to(self.device), targets.to(self.device)
                         outputs = self.model(images)
                         loss = self.warmup_loss(outputs[t], targets - self.model.task_offset[t])
@@ -156,7 +200,7 @@ class Inc_Learning_Appr:
                         hits_taw = (pred == targets).float()
                         total_loss += loss.item() * len(targets)
                         total_acc_taw += hits_taw.sum().item()
-                total_num = len(new_trn_loader.dataset.labels)
+                total_num = len(trn_loader.dataset.labels)
                 trn_loss, trn_acc = total_loss / total_num, total_acc_taw / total_num
                 warmupclock2 = time.time()
                 print('| Warm-up Epoch {:3d}, time={:5.1f}s/{:5.1f}s | Train: loss={:.3f}, TAw acc={:5.1f}% |'.format(
@@ -228,8 +272,8 @@ class Inc_Learning_Appr:
                 total_acc_taw, total_acc_tag, total_ce_taw, total_ce_tag, total_num = 0, 0, 0, 0, 0
                 for images, targets in loader:
                     images, targets = images.to(self.device), targets.to(self.device)
-                    outputs = self.model(images)
-                    hits_taw, hits_tag = self.calculate_metrics(outputs, targets)
+                    outputs, feats = self.model(images, return_features=True)
+                    hits_taw, hits_tag = self.classifier.classify(t, outputs, feats, targets)
                     ce_taw = torch.nn.functional.cross_entropy(outputs[i], targets - self.model.task_offset[i],
                                                                reduction='sum')
                     ce_tag = torch.nn.functional.cross_entropy(torch.cat(outputs, dim=1), targets, reduction='sum')
@@ -265,9 +309,13 @@ class Inc_Learning_Appr:
         return output
 
     def _continual_evaluation_step(self, t):
+        confusion_matrix = torch.zeros((t+1, t+1))
         prev_t_acc = torch.zeros((t,), requires_grad=False)
         current_t_acc = 0.
         sum_acc = 0.
+        total_loss_curr = 0.
+        total_num_curr = 0
+        current_t_acc_taw = 0
         with torch.no_grad():
             loaders = self.tst_loader[:t + 1]
 
@@ -276,15 +324,31 @@ class Inc_Learning_Appr:
                 total_acc_tag = 0.
                 total_acc_taw = 0.
                 total_num = 0
+                task_ids = []
                 for images, targets in loader:
                     images, targets = images.to(self.device), targets.to(self.device)
                     # Forward current model
-                    outputs = self.model(images)
-                    hits_taw, hits_tag = self.calculate_metrics(outputs, targets)
+                    outputs, feats = self.model(images, return_features=True)
+
+                    if task_id == t:
+                        loss = self.criterion(task_id, outputs, targets)
+                        total_loss_curr += loss.item() * len(targets)
+                        total_num_curr += total_num
+
+                    outputs_stacked = torch.stack(outputs, dim=1)
+                    shape = outputs_stacked.shape
+                    hits_taw, hits_tag, outputs = self.classifier.classify(task_id, outputs, feats, targets, return_dists=True)
                     # Log
                     total_acc_tag += hits_tag.sum().data.cpu().numpy().item()
                     total_acc_taw += hits_taw.sum().data.cpu().numpy().item()
                     total_num += len(targets)
+
+                    curr_data_task_ids = self.classifier.get_task_ids(outputs, shape)
+                    task_ids.extend(curr_data_task_ids)
+
+                counts = Counter(task_ids)
+                for j, val in counts.items():
+                    confusion_matrix[task_id, j] = val / len(loader.dataset)
 
                 acc_tag = total_acc_tag / total_num
                 acc_taw = total_acc_taw / total_num
@@ -295,12 +359,18 @@ class Inc_Learning_Appr:
                     prev_t_acc[task_id] = acc_tag
                 else:
                     current_t_acc = acc_tag
+                    current_t_acc_taw = acc_taw
 
             if t > 0:
                 # Average accuracy over all previous tasks
                 self.logger.log_scalar(task=None, iter=None, name="avg_acc_tag", value=100 * sum_acc / t, group="cont_eval")
+
+        if t > 0:
+            recency_bias = confusion_matrix[:-1, -1].mean()
+            self.logger.log_scalar(task=None, iter=None, name="task_recency_bias", value=recency_bias.item(), group="cont_eval")
+
         avg_prev_acc = sum_acc / t if t > 0 else 0.
-        return prev_t_acc, current_t_acc, avg_prev_acc
+        return prev_t_acc, current_t_acc, avg_prev_acc  #, total_loss_curr / total_num_curr, current_t_acc_taw
         # acc poprzednich tasków, acc na aktualnym tasku, średnia z poprzednich tasków
 
     def _log_weight_norms(self, t, prev_w, prev_b, new_w, new_b):
@@ -315,6 +385,7 @@ class Inc_Learning_Appr:
 
     def train_loop(self, t, trn_loader, val_loader):
         """Contains the epochs loop"""
+        self.val_loader_transform = val_loader.dataset.transform
         lr = self.lr
         best_loss = np.inf
         patience = self.lr_patience
@@ -336,7 +407,9 @@ class Inc_Learning_Appr:
 
             # CONTINUAL EVALUATION
             ####################################################################
+            # prev_t_accs, current_acc, avg_prev_acc, _, _ = self._continual_evaluation_step(t)
             prev_t_accs, current_acc, avg_prev_acc = self._continual_evaluation_step(t)
+            # valid_locc and valid_acc are on test_loaders so it works when --use-test-as-val
 
             # save accs on last epoch of task 0
             if t == 0 and e == self.nepochs - 1:
@@ -365,11 +438,14 @@ class Inc_Learning_Appr:
                     for ts in range(sg.shape[0]):
                         self.logger.log_scalar(task=ts, iter=None, name="stability_gap", value=100 * sg[ts].item(), group="cont_eval")
                         self.logger.log_scalar(task=ts, iter=None, name="stability_gap_normal", value=100 * sg_normalized[ts].item(), group="cont_eval")
-                        self.logger.log_scalar(task=None, iter=None, name="stability_gap_avg", value=100 * sg.mean().item(), group="cont_eval")
 
                         self.logger.log_scalar(task=ts, iter=None, name="recovery", value=100 * rec[ts].item(), group="cont_eval")
                         self.logger.log_scalar(task=ts, iter=None, name="recovery_normal", value=100 * rec_normalized[ts].item(), group="cont_eval")
-                        self.logger.log_scalar(task=None, iter=None, name="recovery_avg", value=100 * rec.mean().item(), group="cont_eval")
+                                            
+                    self.logger.log_scalar(task=None, iter=None, name="stability_gap_avg", value=100 * sg.mean().item(), group="cont_eval")
+                    self.logger.log_scalar(task=None, iter=None, name="recovery_avg", value=100 * rec.mean().item(), group="cont_eval")
+                    self.logger.log_scalar(task=None, iter=None, name="sg_normal_avg", value=100 * sg_normalized.mean().item(), group="cont_eval")
+                    self.logger.log_scalar(task=None, iter=None, name="recovery_normal_avg", value=100 * rec_normalized.mean().item(), group="cont_eval")
 
                     # New last acc of prev tasks (current task becomes a prev task)
                     self.last_e_accs = torch.cat((prev_t_accs, torch.tensor([current_acc])))
@@ -387,6 +463,7 @@ class Inc_Learning_Appr:
                 print('| Epoch {:3d}, time={:5.1f}s | Train: skip eval |'.format(e + 1, clock1 - clock0), end='')
 
             # Valid
+            ### EVAL DONE IN CONTINUAL_EVALUATION
             clock3 = time.time()
             valid_loss, valid_acc, _ = self.eval(t, val_loader, log_partial_loss=True)
             clock4 = time.time()
@@ -429,26 +506,33 @@ class Inc_Learning_Appr:
             self.logger.log_scalar(task=t, iter=e + 1, name="lr", value=lr, group="train")
             print()
 
+            # ======== LATENT SPACE ANALYSIS =========
+            # if ((t == 0 and e == self.nepochs - 1) or (t > 0 and e in (0, self.nepochs // 2, self.nepochs - 1))):
+            #     embeddings, labels = self.get_embeddings(t)
+            #     data_vis = self.project_latent_space(embeddings, labels)
+            #     self.logger.log_latent_vis(group="Latent_Vis", task=t, epoch=e, data=data_vis)
+            # ========================================
+
         self.model.set_state_dict(best_model)
 
         # MEASURE LAST HEAD DISTANCE/SIMILARITY
-        if t > 0:
-            head_after_wu_vect = torch.nn.utils.parameters_to_vector(head_after_wu.parameters()).unsqueeze(0)
-            head_curr_vect = torch.nn.utils.parameters_to_vector(self.model.heads[-1].parameters()).unsqueeze(0)
+        # if t > 0:
+        #     head_after_wu_vect = torch.nn.utils.parameters_to_vector(head_after_wu.parameters()).unsqueeze(0)
+        #     head_curr_vect = torch.nn.utils.parameters_to_vector(self.model.heads[-1].parameters()).unsqueeze(0)
 
-            # L2 distance
-            l2_dist = torch.linalg.vector_norm(head_after_wu_vect - head_curr_vect, 2)
-            self.logger.log_scalar(task=None, iter=None, name='L2 distance', group=f"Last head", value=l2_dist.item())
+        #     # L2 distance
+        #     l2_dist = torch.linalg.vector_norm(head_after_wu_vect - head_curr_vect, 2)
+        #     self.logger.log_scalar(task=None, iter=None, name='L2 distance', group=f"Last head", value=l2_dist.item())
 
-            # Cosine Similarity
-            cos_sim = torch.nn.functional.cosine_similarity(head_after_wu_vect, head_curr_vect)
-            self.logger.log_scalar(task=None, iter=None, name='Cos-Sim', group=f"Last head", value=cos_sim.item())
+        #     # Cosine Similarity
+        #     cos_sim = torch.nn.functional.cosine_similarity(head_after_wu_vect, head_curr_vect)
+        #     self.logger.log_scalar(task=None, iter=None, name='Cos-Sim', group=f"Last head", value=cos_sim.item())
 
-            # L2 of the final classifier
-            final_clf_l2 = torch.linalg.vector_norm(head_curr_vect, 2)
-            self.logger.log_scalar(task=None, iter=None, name='clf L2', group=f"Last head", value=final_clf_l2.item())
+        #     # L2 of the final classifier
+        #     final_clf_l2 = torch.linalg.vector_norm(head_curr_vect, 2)
+        #     self.logger.log_scalar(task=None, iter=None, name='clf L2', group=f"Last head", value=final_clf_l2.item())
 
-            self._log_heads_activation_statistics(t)
+            # self._log_heads_activation_statistics(t)
 
     def _log_heads_activation_statistics(self, t):
         self.model.eval()
@@ -475,6 +559,15 @@ class Inc_Learning_Appr:
                 final_max = act_maxs.max()
                 self.logger.log_scalar(task=task_id, iter=None, name='Max', group='Head activations', value=final_max.item())
 
+    def _calc_backbone_grad_norm(self):
+        total_norm = 0
+        for p in self.model.model.parameters():
+            if p.grad is not None:
+                param_norm = p.grad.data.norm(2)
+                total_norm += param_norm.item() ** 2
+        total_norm = total_norm ** 0.5
+        return total_norm
+
     def post_train_process(self, t, trn_loader):
         """Runs after training all the epochs of the task (after the train session)"""
         pass
@@ -492,10 +585,20 @@ class Inc_Learning_Appr:
             if t == 0 or not self.no_learning:
                 self.optimizer.zero_grad()
                 loss.backward()
+                # ======== LOG GRADIENT NORM ========
+                if self.log_grad_norm:
+                    total_norm = self._calc_backbone_grad_norm()
+                    self.logger.log_scalar(task=t, iter=None, name="Backbone", value=total_norm, group="Grad_Norm")
+                # ===================================
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.clipgrad)
+
             self.optimizer.step()
+
         if self.scheduler is not None:
             self.scheduler.step()
+
+        # compute mean of exemplars on every epoch
+        self.classifier.prototypes_update(t, trn_loader, self.val_loader_transform)
 
     def eval(self, t, val_loader, log_partial_loss=False):
         """Contains the evaluation code"""
@@ -506,11 +609,11 @@ class Inc_Learning_Appr:
                 # Forward current model
                 images, targets = images.to(self.device), targets.to(self.device)
 
-                outputs = self.model(images)
+                outputs, feats = self.model(images, return_features=True)
                 loss = self.criterion(t, outputs, targets)
-                hits_taw, hits_tag = self.calculate_metrics(outputs, targets)
+                hits_taw, hits_tag = self.classifier.classify(t, outputs, feats, targets)
 
-                hits_tag / len(targets)
+                # hits_tag / len(targets)
 
                 # Log
                 total_loss += loss.item() * len(targets)
@@ -519,22 +622,6 @@ class Inc_Learning_Appr:
                 total_num += len(targets)
         return total_loss / total_num, total_acc_taw / total_num, total_acc_tag / total_num
 
-    def calculate_metrics(self, outputs, targets):
-        """Contains the main Task-Aware and Task-Agnostic metrics"""
-        pred = torch.zeros_like(targets)
-        # Task-Aware Multi-Head
-        for m in range(len(pred)):
-            this_task = (self.model.task_cls.cumsum(0).to(self.device) <= targets[m]).sum()
-            pred[m] = outputs[this_task][m].argmax() + self.model.task_offset[this_task]
-        hits_taw = (pred == targets).float()
-        # Task-Agnostic Multi-Head
-        if self.multi_softmax:
-            outputs = [torch.nn.functional.log_softmax(output, dim=1) for output in outputs]
-            pred = torch.cat(outputs, dim=1).argmax(1)
-        else:
-            pred = torch.cat(outputs, dim=1).argmax(1)
-        hits_tag = (pred == targets).float()
-        return hits_taw, hits_tag
     def criterion(self, t, outputs, targets):
         """Returns the loss value"""
         return torch.nn.functional.cross_entropy(outputs[t], targets - self.model.task_offset[t])

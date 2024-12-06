@@ -59,7 +59,7 @@ def main(argv=None):
     # dataset args
     parser.add_argument('--datasets', default=['cifar100'], type=str, choices=list(dataset_config.keys()),
                         help='Dataset or datasets used (default=%(default)s)', nargs='+', metavar="DATASET")
-    parser.add_argument('--num-workers', default=4, type=int, required=False,
+    parser.add_argument('--num-workers', default=7, type=int, required=False,
                         help='Number of subprocesses to use for dataloader (default=%(default)s)')
     parser.add_argument('--batch-size', default=64, type=int, required=False,
                         help='Number of samples per batch to load (default=%(default)s)')
@@ -98,6 +98,8 @@ def main(argv=None):
                         help='Mode of new head weights initialization (default=%(default)s)')
     parser.add_argument('--pretrained', action='store_true',
                         help='Use pretrained backbone (default=%(default)s)')
+    parser.add_argument('--projector-type', default="mlp", type=str, required=False, choices=["mlp", "linear"],
+                        help='Use pretrained backbone (default=%(default)s)')
     # training args
     parser.add_argument('--approach', default='finetuning', type=str, choices=approach.__all__,
                         help='Learning approach used (default=%(default)s)', metavar="APPROACH")
@@ -105,10 +107,10 @@ def main(argv=None):
                         help='Number of epochs per training session (default=%(default)s)')
     parser.add_argument('--lr', default=0.1, type=float, required=False,
                         help='Starting learning rate (default=%(default)s)')
-    parser.add_argument('--scheduler-milestones', default=False, action='store_true', required=False,
+    parser.add_argument('--scheduler-type', default="linear", type=str, required=False, choices=["linear", "cosine"],
                         help='If True, then LinearLR scheduler will be used, '
                              'if set to False scheduler will not be used (default=%(default)s)')  # default=[60, 120, 160]
-    parser.add_argument('--lr-min', default=1e-4, type=float, required=False,
+    parser.add_argument('--lr-min', default=1e-6, type=float, required=False,
                         help='Minimum learning rate (default=%(default)s)')
     parser.add_argument('--lr-factor', default=3, type=float, required=False,
                         help='Learning rate decreasing factor (default=%(default)s)')
@@ -143,6 +145,12 @@ def main(argv=None):
                         help='Additional data augmentations (default=%(default)s)')
     parser.add_argument('--reset-backbone', action='store_true',
                         help='Reset backbone weights between tasks ((default=%(default)s))')
+    parser.add_argument('--classifier', default="linear", required=False, choices=['linear', 'nmc', 'knn'],
+                        help='Classification head strategy (default=%(default)s)')
+    parser.add_argument('--best_prototypes', action='store_true',
+                        help='Calculate prototypes on full trainset (default=%(default)s)')
+    parser.add_argument('--slca', action='store_true',
+                        help='Training with SLCA ((default=%(default)s))')
 
     # gridsearch args
     parser.add_argument('--gridsearch-tasks', default=0, type=int,
@@ -151,13 +159,13 @@ def main(argv=None):
     # Args -- Incremental Learning Framework
     args, extra_args = parser.parse_known_args(argv)
     args.results_path = os.path.expanduser(args.results_path)
-    base_kwargs = dict(nepochs=args.nepochs, lr=args.lr, lr_min=args.lr_min, lr_factor=args.lr_factor,
+    base_kwargs = dict(classifier=args.classifier, nepochs=args.nepochs, lr=args.lr, lr_min=args.lr_min, lr_factor=args.lr_factor,
                        lr_patience=args.lr_patience, clipgrad=args.clipping, momentum=args.momentum,
                        wd=args.weight_decay, multi_softmax=args.multi_softmax, wu_nepochs=args.wu_nepochs,
                        wu_lr=args.wu_lr, wu_fix_bn=args.wu_fix_bn, wu_scheduler=args.wu_scheduler,
                        wu_patience=args.wu_patience, wu_wd=args.wu_wd, fix_bn=args.fix_bn,
                        eval_on_train=args.eval_on_train, select_best_model_by_val_loss=True,
-                       scheduler_milestones=args.scheduler_milestones)
+                       scheduler_type=args.scheduler_type, slca=args.slca)
 
     if args.no_cudnn_deterministic:
         print('WARNING: CUDNN Deterministic will be disabled.')
@@ -189,6 +197,7 @@ def main(argv=None):
 
     # Args -- Network
     from networks.network import LLL_Net
+    from networks.ssl_network import SSL_Net
     if args.network in tvmodels:  # torchvision models
         tvnet = getattr(importlib.import_module(name='torchvision.models'), args.network)
         if args.network == 'googlenet':
@@ -253,7 +262,7 @@ def main(argv=None):
     trn_loader, val_loader, tst_loader, taskcla = get_loaders(args.datasets, args.num_tasks, args.nc_first_task,
                                                               args.nc_per_task,
                                                               args.batch_size, num_workers=args.num_workers,
-                                                              pin_memory=True,
+                                                              pin_memory=False,
                                                               max_classes_per_dataset=args.max_classes_per_dataset,
                                                               max_examples_per_class_trn=args.max_examples_per_class_trn,
                                                               max_examples_per_class_val=args.max_examples_per_class_val,
@@ -270,7 +279,11 @@ def main(argv=None):
 
     # Network and Approach instances
     utils.seed_everything(seed=args.seed)
-    net = LLL_Net(init_model, remove_existing_head=not args.keep_existing_head, head_init_mode=args.head_init_mode)
+
+    if args.approach in ["scr", "mixed"]:
+        net = SSL_Net(init_model, remove_existing_head=not args.keep_existing_head, head_init_mode=args.head_init_mode, projector_type=args.projector_type)
+    else:
+        net = LLL_Net(init_model, remove_existing_head=not args.keep_existing_head, head_init_mode=args.head_init_mode)
     utils.seed_everything(seed=args.seed)
     # taking transformations and class indices from first train dataset
     first_train_ds = trn_loader[0].dataset
@@ -312,8 +325,8 @@ def main(argv=None):
         print('*' * 108)
 
         # save current model for next CKA calculation
-        prev_t_net = deepcopy(net)  # save also the model from before the training
-        prev_t_net.to(device)
+        # prev_t_net = deepcopy(net)  # save also the model from before the training
+        # prev_t_net.to(device)
 
         # Add head for current task
         net.add_head(taskcla[t][1])
@@ -381,26 +394,26 @@ def main(argv=None):
         if t == 0 and args.ne_first_task is not None:
             appr.nepochs = args.nepochs
 
-        # Measure distance between previous and current model
-        prev_vect = torch.nn.utils.parameters_to_vector(prev_t_net.model.parameters()).unsqueeze(0)
-        curr_vect = torch.nn.utils.parameters_to_vector(net.model.parameters()).unsqueeze(0)
+        # # Measure distance between previous and current model
+        # prev_vect = torch.nn.utils.parameters_to_vector(prev_t_net.model.parameters()).unsqueeze(0)
+        # curr_vect = torch.nn.utils.parameters_to_vector(net.model.parameters()).unsqueeze(0)
 
-        # L2 distance
-        l2_dist = torch.linalg.vector_norm(prev_vect - curr_vect, 2)
-        logger.log_scalar(task=None, iter=None, name='L2', group=f"Model distance", value=l2_dist.item())
+        # # L2 distance
+        # l2_dist = torch.linalg.vector_norm(prev_vect - curr_vect, 2)
+        # logger.log_scalar(task=None, iter=None, name='L2', group=f"Model distance", value=l2_dist.item())
 
-        # Cosine Similarity
-        cos_sim = torch.nn.functional.cosine_similarity(prev_vect, curr_vect)
-        logger.log_scalar(task=None, iter=None, name='Cos-Sim', group=f"Model distance", value=cos_sim.item())
+        # # Cosine Similarity
+        # cos_sim = torch.nn.functional.cosine_similarity(prev_vect, curr_vect)
+        # logger.log_scalar(task=None, iter=None, name='Cos-Sim', group=f"Model distance", value=cos_sim.item())
 
         # Test
         for u in range(t + 1):
             test_loss[t, u], acc_taw[t, u], acc_tag[t, u] = appr.eval(u, tst_loader[u])
 
             # CKA
-            if t > 0:
-                _cka = cka(net, prev_t_net, tst_loader[u], device)
-                logger.log_scalar(task=None, iter=None, name=f't_{u}', group=f"cka", value=_cka)
+            # if t > 0:
+            #     _cka = cka(net, prev_t_net, tst_loader[u], device)
+            #     logger.log_scalar(task=None, iter=None, name=f't_{u}', group=f"cka", value=_cka)
 
             # FORG
             if u < t:
@@ -419,7 +432,7 @@ def main(argv=None):
             logger.log_scalar(task=u, iter=t, name='forg_tag', group='test', value=100 * forg_tag[t, u])
 
         # save current model for next CKA calculation
-        prev_t_net = deepcopy(net)
+        # prev_t_net = deepcopy(net)
 
         # Save
         print('Save at ' + os.path.join(args.results_path, full_exp_name))
@@ -428,7 +441,7 @@ def main(argv=None):
         logger.log_result(forg_taw, name="forg_taw", step=t, skip_wandb=True)
         logger.log_result(forg_tag, name="forg_tag", step=t, skip_wandb=True)
         if args.cm:
-            logger.log_result(cm(appr.model, tst_loader[:t + 1], args.num_tasks, appr.device), name="cm", step=t,
+            logger.log_result(cm(appr, tst_loader[:t + 1], args.num_tasks, appr.device), name="cm", step=t,
                               title="Task confusion matrix", xlabel="Predicted task", ylabel="True task", annot=True,
                               cmap='Blues', cbar=True, vmin=0, vmax=1)
 

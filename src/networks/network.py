@@ -68,6 +68,7 @@ class LLL_Net(nn.Module):
         """
         x = self.model(x)
         assert (len(self.heads) > 0), "Cannot access any head"
+
         y = []
         for head in self.heads:
             y.append(head(x))

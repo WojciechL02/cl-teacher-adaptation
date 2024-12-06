@@ -16,7 +16,7 @@ from . import base_dataset as basedat
 from . import memory_dataset as memd
 from .dataset_config import dataset_config
 from .autoaugment import CIFAR10Policy, ImageNetPolicy
-from .ops import Cutout
+from .ops import Cutout, TwoCropTransform
 
 
 def get_loaders(datasets, num_tasks, nc_first_task, nc_per_task, batch_size, num_workers,
@@ -347,6 +347,9 @@ def get_transforms(resize, test_resize, pad, crop, flip, normalize, extend_chann
         tst_transform_list.append(transforms.Lambda(
             lambda x: x.repeat(extend_channel, 1, 1)))
 
+    if "simclr" in extra_aug:
+        return TwoCropTransform(transforms.Compose(trn_transform_list)), transforms.Compose(tst_transform_list)
+
     return transforms.Compose(trn_transform_list), \
         transforms.Compose(tst_transform_list)
 
@@ -367,18 +370,19 @@ def _ensure_imagenet_subset_prepared(path):
         path), f"Please first download and extract dataset from: https://www.kaggle.com/datasets/arjunashok33/imagenet-subset-for-inc-learn to dir: {path}"
     ds_conf = dataset_config['imagenet_subset_kaggle']
     clsss2idx = {c: i for i, c in enumerate(ds_conf['lbl_order'])}
-    print(f'Generating train/test splits for ImageNet-Subset directory: {path}')
 
     def prepare_split(split='train', outfile='train.txt'):
         with open(f"{path}/{outfile}", 'wt') as f:
-            for fn in glob.glob(f"{path}/data/{split}/*/*"):
+            for fn in glob.glob(f"{path}/{split}/*/*"):
                 c = fn.split('/')[-2]
                 lbl = clsss2idx[c]
                 relative_path = fn.replace(f"{path}/", '')
                 f.write(f"{relative_path} {lbl}\n")
-
-    prepare_split()
-    prepare_split('val', outfile='test.txt')
+    
+    if not os.path.exists(f"{path}/train.txt"):
+        print(f'Generating train/test splits for ImageNet-Subset directory: {path}')
+        prepare_split()
+        prepare_split('val', outfile='test.txt')
 
 def _ensure_tinyimagenet_prepared(path):
     assert os.path.exists(

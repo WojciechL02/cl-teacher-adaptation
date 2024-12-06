@@ -17,11 +17,13 @@ class Appr(Inc_Learning_Appr):
     """
 
     def __init__(self, model, device, nepochs=60, lr=0.5, lr_min=1e-4, lr_factor=3, lr_patience=5, clipgrad=10000,
-                 momentum=0.9, wd=1e-5, multi_softmax=False, wu_nepochs=0, wu_lr_factor=1, fix_bn=False,
-                 eval_on_train=False, select_best_model_by_val_loss=True, logger=None, exemplars_dataset=None, scheduler_milestones=None, lamb=1):
+                momentum=0.9, wd=1e-5, multi_softmax=False, wu_nepochs=0, wu_lr=0, wu_wd=0, wu_fix_bn=False, wu_lr_factor=1,
+                fix_bn=False, wu_scheduler='constant', wu_patience=None, eval_on_train=False, select_best_model_by_val_loss=True,
+                logger=None, exemplars_dataset=None, scheduler_milestones=None, lamb=1):
         super(Appr, self).__init__(model, device, nepochs, lr, lr_min, lr_factor, lr_patience, clipgrad, momentum, wd,
-                                   multi_softmax, wu_nepochs, wu_lr_factor, fix_bn, eval_on_train,
-                                   select_best_model_by_val_loss, logger, exemplars_dataset, scheduler_milestones)
+                                   multi_softmax, wu_nepochs, wu_lr, wu_fix_bn, wu_scheduler, wu_patience, wu_wd,
+                                   fix_bn, eval_on_train, select_best_model_by_val_loss, logger, exemplars_dataset,
+                                   scheduler_milestones)
         self.model_old = None
         self.lamb = lamb
 
@@ -152,19 +154,20 @@ class Appr(Inc_Learning_Appr):
         if self.scheduler is not None:
             self.scheduler.step()
 
-    def eval(self, t, val_loader):
+    def eval(self, t, val_loader, log_partial_loss=False):
         """Contains the evaluation code"""
         with torch.no_grad():
             total_loss, total_acc_taw, total_acc_tag, total_num = 0, 0, 0, 0
             self.model.eval()
             for images, targets in val_loader:
+                images, targets = images.to(self.device), targets.to(self.device)
                 # Forward old model
                 outputs_old = None
                 if t > 0:
-                    outputs_old = self.model_old(images.to(self.device))
+                    outputs_old = self.model_old(images)
                 # Forward current model
-                outputs, feats = self.model(images.to(self.device), return_features=True)
-                loss = self.criterion(t, outputs, targets.to(self.device), outputs_old)
+                outputs, feats = self.model(images, return_features=True)
+                loss = self.criterion(t, outputs, targets, outputs_old)
                 # during training, the usual accuracy is computed on the outputs
                 if not self.exemplar_means:
                     hits_taw, hits_tag = self.calculate_metrics(outputs, targets)

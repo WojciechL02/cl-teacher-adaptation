@@ -18,7 +18,7 @@ tvmodels = ['alexnet',
             'vgg11', 'vgg11_bn', 'vgg13', 'vgg13_bn', 'vgg16', 'vgg16_bn', 'vgg19_bn', 'vgg19',
             'wide_resnet50_2', 'wide_resnet101_2',
             'efficientnet_b0', 'efficientnet_b1', 'efficientnet_b2', 'efficientnet_b3', 'efficientnet_b4',
-            'efficientnet_b5', 'efficientnet_b6', 'efficientnet_b7',
+            'efficientnet_b5', 'efficientnet_b6', 'efficientnet_b7', 'vit_b_16', 'vit_b_32'
             ]
 
 allmodels = tvmodels + ['resnet32', 'resnet32_no_bn', 'resnet32_ln', 'LeNet', 'VggNet']
@@ -47,5 +47,7 @@ def set_tvmodel_head_var(model):
         model.head_var = 'classifier'
     elif type(model) == models.MobileNetV3:
         model.head_var = 'classifier'
+    elif type(model) == models.VisionTransformer:
+        model.head_var = 'heads'
     else:
         raise ModuleNotFoundError

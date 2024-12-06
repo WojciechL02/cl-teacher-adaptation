@@ -17,6 +17,7 @@ wu_wd=${12:-0}
 lr=${13:-0.1}
 head_init=${14}
 stop_at_task=${15:-0}
+classifier=${16}
 
 if [ "${dataset}" = "imagenet_subset_kaggle" ]; then
   clip=1.0
@@ -43,7 +44,7 @@ if [ ${wu_epochs} -gt 0 ]; then
     --log disk wandb \
     --results-path ${result_path} \
     --tags ${tag} \
-    --scheduler-milestones \
+    --scheduler-type linear \
     --cm \
     --approach lwf \
     --taskwise-kd \
@@ -74,11 +75,13 @@ else
     --log disk wandb \
     --results-path ${result_path} \
     --tags ${tag} \
-    --scheduler-milestones \
+    --scheduler-type linear \
     --cm \
     --approach lwf \
     --taskwise-kd \
     --stop-at-task ${stop_at_task} \
     --lamb ${lamb} \
-    --head-init-mode ${head_init}
+    --head-init-mode ${head_init} \
+    --num-exemplars 2000 \
+    --classifier ${classifier}
 fi

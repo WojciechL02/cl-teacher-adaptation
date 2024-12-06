@@ -16,9 +16,12 @@ wu_wd=${11:-0.0}
 lr=${12:-0.1}
 head_init=${13}
 stop_at_task=${14:-0}
+exemplars=${15:-20}
+bsz=${16:-128}
+classifier=${17}
 
 if [ ${wu_epochs} -gt 0 ]; then
-  exp_name="cifar100t${num_tasks}s${nc_first_task}_${tag}_wu_hz_wd:${wu_wd}"
+  exp_name="t${num_tasks}s${nc_first_task}_wu_hz_wd:${wu_wd}_m:${exemplars}"
   result_path="results/${tag}/ft_wu_hz_${seed}"
   python3 src/main_incremental.py \
     --exp-name ${exp_name} \
@@ -31,7 +34,7 @@ if [ ${wu_epochs} -gt 0 ]; then
     --lr ${lr} \
     --wu-wd ${wu_wd} \
     --nepochs ${num_epochs} \
-    --batch-size 128 \
+    --batch-size ${bsz} \
     --seed ${seed} \
     --log disk wandb \
     --results-path ${result_path} \
@@ -40,14 +43,14 @@ if [ ${wu_epochs} -gt 0 ]; then
     --stop-at-task ${stop_at_task} \
     --approach finetuning \
     --scheduler-milestones \
-    --num-exemplars 2000 \
+    --num-exemplars ${exemplars} \
     --wu-nepochs ${wu_epochs} \
     --wu-lr ${wu_lr} \
     --wu-fix-bn \
     --wu-scheduler cosine \
     --head-init-mode ${head_init}
 else
-  exp_name="cifar100t${num_tasks}s${nc_first_task}_${tag}_hz"
+  exp_name="t${num_tasks}s${nc_first_task}_hz_m:${exemplars}"
   result_path="results/${tag}/ft_hz_${seed}"
   python3 src/main_incremental.py \
     --exp-name ${exp_name} \
@@ -60,15 +63,16 @@ else
     --lr ${lr} \
     --wu-wd ${wu_wd} \
     --nepochs ${num_epochs} \
-    --batch-size 128 \
+    --batch-size ${bsz} \
     --seed ${seed} \
     --log disk wandb \
     --results-path ${result_path} \
     --tags ${tag} \
-    --scheduler-milestones \
+    --scheduler-type linear \
     --cm \
     --stop-at-task ${stop_at_task} \
     --approach finetuning \
-    --num-exemplars 2000 \
-    --head-init-mode ${head_init}
+    --num-exemplars ${exemplars} \
+    --head-init-mode ${head_init} \
+    --classifier ${classifier}
 fi

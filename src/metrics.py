@@ -33,19 +33,30 @@ def _HSIC(X: torch.Tensor, Y: torch.Tensor) -> torch.Tensor:
     return torch.trace(GX @ H @ GY @ H)
 
 
-def cm(model, dataloaders, n_tasks, device):
+def cm(appr, dataloaders, n_tasks, device):
     confusion_matrix = np.zeros((n_tasks, n_tasks))
+    model = appr.model
 
     model.eval()
     with torch.no_grad():
         for i, dl in enumerate(dataloaders):
             task_ids = []
-            for images, _ in dl:
+            for images, targets in dl:
                 images = images.to(device)
-                outputs = model(images)
+                targets = targets.to(device)
+                outputs, feats = model(images, return_features=True)
                 outputs = torch.stack(outputs, dim=1)
-                outputs = torch.max(outputs, dim=-1)[0]
-                task_ids.extend(outputs.argmax(dim=-1).tolist())
+                shape = outputs.shape
+                try:
+                    _, _, outputs = appr.classify(i, feats, targets, return_dists=True)
+                    outputs = outputs.view(shape[0], shape[1], shape[2])
+                    outputs = torch.min(outputs, dim=-1)[0]
+                    outputs = outputs.argmin(dim=-1)
+                except Exception:
+                    outputs = torch.max(outputs, dim=-1)[0]
+                    outputs = outputs.argmax(dim=-1)
+
+                task_ids.extend(outputs.tolist())
             counts = Counter(task_ids)
             for j, val in counts.items():
                 confusion_matrix[i, j] = val / len(dl.dataset)
