@@ -96,14 +96,13 @@ class Appr(Inc_Learning_Appr):
                                                      batch_size=trn_loader.batch_size,
                                                      shuffle=True,
                                                      num_workers=trn_loader.num_workers,
-                                                     pin_memory=trn_loader.pin_memory)
+                                                     )
         
         if t > 0:
             exemplar_loader = torch.utils.data.DataLoader(self.exemplars_dataset,
                                                      batch_size=self.replay_batch_size,
                                                      shuffle=True,
                                                      num_workers=trn_loader.num_workers,
-                                                     pin_memory=trn_loader.pin_memory,
                                                      drop_last=True
                                                      )
             trn_loader = zip(trn_loader, exemplar_loader)

@@ -15,7 +15,9 @@ wu_epochs=${10:-0}
 wu_lr=${11:-0.1}
 wu_wd=${12:-0}
 lr=${13:-0.1}
-stop_at_task=${14:-0}
+head_init=${14}
+stop_at_task=${15:-0}
+classifier=${16}
 
 if [ "${dataset}" = "imagenet_subset_kaggle" ]; then
   clip=1.0
@@ -24,8 +26,8 @@ else
 fi
 
 if [ ${wu_epochs} -gt 0 ]; then
-  exp_name="cifar100t${num_tasks}s${nc_first_task}_${tag}_wu_wd:${wu_wd}"
-  result_path="results/${tag}/lwf_wu_${lamb}_${seed}"
+  exp_name="cifar100t${num_tasks}s${nc_first_task}_${tag}_wu_hz_wd:${wu_wd}"
+  result_path="results/${tag}/lwf_wu_hz_${lamb}_${seed}"
   python3 src/main_incremental.py \
     --exp-name ${exp_name} \
     --gpu ${gpu} \
@@ -52,10 +54,11 @@ if [ ${wu_epochs} -gt 0 ]; then
     --wu-lr ${wu_lr} \
     --wu-wd ${wu_wd} \
     --wu-fix-bn \
-    --wu-scheduler cosine
+    --wu-scheduler cosine \
+    --head-init-mode ${head_init}
 else
-  exp_name="cifar100t${num_tasks}s${nc_first_task}_${tag}_base"
-  result_path="results/${tag}/lwf_base_${lamb}_${seed}"
+  exp_name="cifar100t${num_tasks}s${nc_first_task}_${tag}_hz"
+  result_path="results/${tag}/lwf_hz_${lamb}_${seed}"
   python3 src/main_incremental.py \
     --exp-name ${exp_name} \
     --gpu ${gpu} \
@@ -72,10 +75,13 @@ else
     --log disk wandb \
     --results-path ${result_path} \
     --tags ${tag} \
-    --scheduler-milestones \
+    --scheduler-type linear \
     --cm \
     --approach lwf \
     --taskwise-kd \
     --stop-at-task ${stop_at_task} \
-    --lamb ${lamb}
+    --lamb ${lamb} \
+    --head-init-mode ${head_init} \
+    --num-exemplars 2000 \
+    --classifier ${classifier}
 fi

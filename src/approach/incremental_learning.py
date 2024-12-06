@@ -21,7 +21,7 @@ class Inc_Learning_Appr:
                  momentum=0, wd=0, multi_softmax=False, wu_nepochs=0, wu_lr=1e-1, wu_fix_bn=False,
                  wu_scheduler='constant', wu_patience=None, wu_wd=0., fix_bn=False,
                  eval_on_train=False, select_best_model_by_val_loss=True, logger: ExperimentLogger = None,
-                 exemplars_dataset: ExemplarsDataset = None, scheduler_milestones=False, no_learning=False, log_grad_norm=True, best_prototypes=False, slca=False):
+                 exemplars_dataset: ExemplarsDataset = None, scheduler_type=False, no_learning=False, log_grad_norm=True, best_prototypes=False, slca=False):
         self.model = model
         self.device = device
         self.nepochs = nepochs
@@ -46,7 +46,7 @@ class Inc_Learning_Appr:
         self.eval_on_train = eval_on_train
         self.select_best_model_by_val_loss = select_best_model_by_val_loss
         self.optimizer = None
-        self.scheduler_milestones = scheduler_milestones
+        self.scheduler_type = scheduler_type
         self.scheduler = None
         self.debug = False
         self.no_learning = no_learning
@@ -79,11 +79,14 @@ class Inc_Learning_Appr:
             network_params = [backbone_params, head_params]
             return torch.optim.SGD(network_params, lr=self.lr, weight_decay=self.wd, momentum=self.momentum)
         return torch.optim.SGD(self.model.parameters(), lr=self.lr, weight_decay=self.wd, momentum=self.momentum)
+        # return torch.optim.AdamW(self.model.parameters(), lr=self.lr, weight_decay=self.wd)
 
     def _get_scheduler(self):
-        if self.scheduler_milestones:
+        if self.scheduler_type == "linear":
             # return torch.optim.lr_scheduler.MultiStepLR(optimizer=self.optimizer, milestones=self.scheduler_milestones, gamma=0.1)
             return torch.optim.lr_scheduler.LinearLR(optimizer=self.optimizer, start_factor=1.0, end_factor=0.01, total_iters=self.nepochs)
+        elif self.scheduler_type == "cosine":
+            return torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=self.optimizer, T_max=self.nepochs, eta_min=self.lr*0.01)
         else:
             return None
 
@@ -269,8 +272,8 @@ class Inc_Learning_Appr:
                 total_acc_taw, total_acc_tag, total_ce_taw, total_ce_tag, total_num = 0, 0, 0, 0, 0
                 for images, targets in loader:
                     images, targets = images.to(self.device), targets.to(self.device)
-                    outputs = self.model(images)
-                    hits_taw, hits_tag = self.classifier.classify(t, outputs, targets)
+                    outputs, feats = self.model(images, return_features=True)
+                    hits_taw, hits_tag = self.classifier.classify(t, outputs, feats, targets)
                     ce_taw = torch.nn.functional.cross_entropy(outputs[i], targets - self.model.task_offset[i],
                                                                reduction='sum')
                     ce_tag = torch.nn.functional.cross_entropy(torch.cat(outputs, dim=1), targets, reduction='sum')

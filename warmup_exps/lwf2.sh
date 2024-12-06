@@ -26,7 +26,7 @@ else
 fi
 
 if [ ${wu_epochs} -gt 0 ]; then
-  exp_name="cifar100t${num_tasks}s${nc_first_task}_${tag}_wu_hz_wd:${wu_wd}"
+  exp_name="cifar100t${num_tasks}s${nc_first_task}_${tag}_wu_hz"
   result_path="results/${tag}/lwf_wu_hz_${lamb}_${seed}"
   python3 src/main_incremental.py \
     --exp-name ${exp_name} \
@@ -55,7 +55,8 @@ if [ ${wu_epochs} -gt 0 ]; then
     --wu-wd ${wu_wd} \
     --wu-fix-bn \
     --wu-scheduler cosine \
-    --head-init-mode ${head_init}
+    --head-init-mode ${head_init} \
+    --classifier ${classifier}
 else
   exp_name="cifar100t${num_tasks}s${nc_first_task}_${tag}_hz"
   result_path="results/${tag}/lwf_hz_${lamb}_${seed}"
@@ -82,6 +83,5 @@ else
     --stop-at-task ${stop_at_task} \
     --lamb ${lamb} \
     --head-init-mode ${head_init} \
-    --num-exemplars 2000 \
     --classifier ${classifier}
 fi
