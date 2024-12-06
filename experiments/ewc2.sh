@@ -17,6 +17,7 @@ lr=${12:-0.1}
 lamb=${13}
 head_init=${14}
 stop_at_task=${15:-0}
+classifier=${16}
 
 if [ ${wu_epochs} -gt 0 ]; then
   exp_name="cifar100t${num_tasks}s${nc_first_task}_${tag}_wu_hz_wd:${wu_wd}"
@@ -36,7 +37,7 @@ if [ ${wu_epochs} -gt 0 ]; then
     --log disk wandb \
     --results-path ${result_path} \
     --tags ${tag} \
-    --scheduler-milestones \
+    --scheduler-type linear \
     --cm \
     --stop-at-task ${stop_at_task} \
     --approach ewc \
@@ -65,10 +66,12 @@ else
     --log disk wandb \
     --results-path ${result_path} \
     --tags ${tag} \
-    --scheduler-milestones \
+    --scheduler-type linear \
     --cm \
     --stop-at-task ${stop_at_task} \
     --approach ewc \
     --lamb ${lamb} \
-    --head-init-mode ${head_init}
+    --head-init-mode ${head_init} \
+    --num-exemplars 2000 \
+    --classifier ${classifier}
 fi

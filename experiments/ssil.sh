@@ -17,6 +17,7 @@ wu_wd=${12:-0}
 lr=${13:-0.1}
 head_init=${14}
 stop_at_task=${15:-0}
+classifier=${16}
 
 if [ ${wu_epochs} -gt 0 ]; then
   exp_name="cifar100t${num_tasks}s${nc_first_task}_${tag}_wu_hz_lamb_${lamb}_lr:${lr}"
@@ -37,7 +38,7 @@ if [ ${wu_epochs} -gt 0 ]; then
     --results-path ${result_path} \
     --tags ${tag} \
     --cm \
-    --scheduler-milestones \
+    --scheduler-type linear \
     --approach ssil \
     --stop-at-task ${stop_at_task} \
     --lamb ${lamb} \
@@ -50,7 +51,7 @@ if [ ${wu_epochs} -gt 0 ]; then
     --num-exemplars 2000
 else
   exp_name="cifar100t${num_tasks}s${nc_first_task}_${tag}_hz_lamb_${lamb}_lr:${lr}"
-  result_path="results/${tag}/lwf_hz_${lamb}_${seed}"
+  result_path="results/${tag}/ssil_hz_${lamb}_${seed}"
   python3 src/main_incremental.py \
     --exp-name ${exp_name} \
     --gpu ${gpu} \
@@ -67,11 +68,11 @@ else
     --results-path ${result_path} \
     --tags ${tag} \
     --cm \
-    --scheduler-milestones \
+    --scheduler-type linear \
     --approach ssil \
     --stop-at-task ${stop_at_task} \
     --lamb ${lamb} \
     --head-init-mode ${head_init} \
     --num-exemplars 2000 \
-    --classifier nmc
+    --classifier ${classifier}
 fi

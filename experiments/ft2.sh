@@ -18,6 +18,7 @@ head_init=${13}
 stop_at_task=${14:-0}
 exemplars=${15:-20}
 bsz=${16:-128}
+classifier=${17}
 
 if [ ${wu_epochs} -gt 0 ]; then
   exp_name="t${num_tasks}s${nc_first_task}_wu_hz_wd:${wu_wd}_m:${exemplars}"
@@ -67,10 +68,11 @@ else
     --log disk wandb \
     --results-path ${result_path} \
     --tags ${tag} \
-    --scheduler-milestones \
+    --scheduler-type linear \
     --cm \
     --stop-at-task ${stop_at_task} \
     --approach finetuning \
     --num-exemplars ${exemplars} \
-    --head-init-mode ${head_init}
+    --head-init-mode ${head_init} \
+    --classifier ${classifier}
 fi
