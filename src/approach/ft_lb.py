@@ -25,7 +25,7 @@ class LieBracketOptimizer(Optimizer):
         Performs a single optimization step.
 
         Args:
-            lie_bracket (list[Tensor]): Precomputed Lie Bracket [∇L1, ∇L2].
+            lie_bracket (list[Tensor]): Precomputed Lie Bracket [grad L1, grad L2].
         """
         lie_bracket_len = len(lie_bracket) if lie_bracket is not None else 0
         for group in self.param_groups:
@@ -40,13 +40,17 @@ class LieBracketOptimizer(Optimizer):
 
                 if i < lie_bracket_len:
                     lie_bracket_term = lie_bracket[i] * param.data if lie_bracket[i] is not None else 0.0
+                    # param.data = (h / 2) * lie_bracket_term - grad
+                    # print(param.data)
                 else:
                     lie_bracket_term = 0.0
+                    # param.data -= lr * grad
 
-                grad = grad.add(lie_bracket_term, alpha=-(h / 2))
+                grad = grad.add(lie_bracket_term, alpha=-(h / (2 * lr)))
 
                 # Update rule: θ = θ - lr * (∇L_tilde - h/2 * Lie Bracket)
                 param.data -= lr * grad
+                
 
 
 class Appr(Inc_Learning_Appr):
@@ -62,8 +66,9 @@ class Appr(Inc_Learning_Appr):
                                    fix_bn, eval_on_train, select_best_model_by_val_loss, logger, exemplars_dataset,
                                    scheduler_milestones, no_learning, slca=slca)
         self.all_out = all_outputs
-        self.lamb = 0.5
-        self.h = 0.05
+        self.lamb = 0.3
+        self.h1 = 0.05
+        self.h2 = 0.15
         self.replay_batch_size = 100
 
     @staticmethod
@@ -94,8 +99,8 @@ class Appr(Inc_Learning_Appr):
             params = list(self.model.model.parameters()) + list(self.model.heads[-1].parameters())
         else:
             params = self.model.parameters()
-        return torch.optim.SGD(params, lr=self.lr, weight_decay=self.wd, momentum=self.momentum)
-        # return LieBracketOptimizer(params, self.lr, h=0.05)
+        # return torch.optim.SGD(params, lr=self.lr, weight_decay=self.wd, momentum=self.momentum)
+        return LieBracketOptimizer(params, self.lr, h=0.2)
 
     def train_loop(self, t, trn_loader, val_loader):
         """Contains the epochs loop"""
@@ -163,13 +168,14 @@ class Appr(Inc_Learning_Appr):
                 features_old = self.model(images_r)
 
             if t > 0:
-                # loss, loss1, loss2, ngrad1, ngrad2, lie_bracket = self.criterion(t, features_new, targets, features_old, targets_r, is_eval=False)
-                loss, loss1, loss2, lie_bracket_norm = self.criterion(t, features_new, targets, features_old, targets_r, is_eval=False)
-                # lie_bracket_norm = sum(torch.norm(lb) for lb in lie_bracket if lb is not None)
+                loss, loss1, loss2, ngrad1, ngrad2, lie_bracket = self.criterion(t, features_new, targets, features_old, targets_r, is_eval=False)
+                # loss, loss1, loss2, lie_bracket_norm = self.criterion(t, features_new, targets, features_old, targets_r, is_eval=False)
+                # loss, loss1, loss2 = self.criterion(t, features_new, targets, features_old, targets_r, is_eval=False)
+                lie_bracket_norm = sum(torch.norm(lb) for lb in lie_bracket if lb is not None)
                 self.logger.log_scalar(task=None, iter=None, name="loss1", value=loss1.item(), group="train")
                 self.logger.log_scalar(task=None, iter=None, name="loss2", value=loss2.item(), group="train")
-                # self.logger.log_scalar(task=None, iter=None, name="grad1_norm", value=ngrad1.item(), group="train")
-                # self.logger.log_scalar(task=None, iter=None, name="grad2_norm", value=ngrad2.item(), group="train")
+                self.logger.log_scalar(task=None, iter=None, name="grad1_norm", value=ngrad1.item(), group="train")
+                self.logger.log_scalar(task=None, iter=None, name="grad2_norm", value=ngrad2.item(), group="train")
                 self.logger.log_scalar(task=None, iter=None, name="lie_bracket_norm", value=lie_bracket_norm.item(), group="train")
             else:
                 loss = self.criterion(t, features_new, targets, features_old, targets_r, is_eval=False)
@@ -182,44 +188,14 @@ class Appr(Inc_Learning_Appr):
             loss.backward()
 
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.clipgrad)
-            # self.optimizer.step(lie_bracket)
-            self.optimizer.step()
+            self.optimizer.step(lie_bracket)
+            # self.optimizer.step()
 
         if self.scheduler is not None:
             self.scheduler.step()
 
         # compute mean of exemplars on every epoch
         self.classifier.prototypes_update(t, full_loader, self.val_loader_transform)
-
-    # def criterion(self, t, outputs_new, targets_new, outputs_old=None, targets_old=None, is_eval=True):
-    #     """Returns the loss value"""
-
-    #     if is_eval is True:
-    #         return torch.nn.functional.cross_entropy(torch.cat(outputs_new, dim=1), targets_new)
-
-    #     elif self.all_out or len(self.exemplars_dataset) > 0:
-    #         L1 = torch.nn.functional.cross_entropy(torch.cat(outputs_old[:-1], dim=1), targets_old)
-    #         L2 = torch.nn.functional.cross_entropy(outputs_new[t], targets_new - self.model.task_offset[t])
-
-    #         self.model.zero_grad()
-
-    #         grad_L1 = torch.autograd.grad(L1, self.model.model.parameters(), create_graph=True)
-    #         grad_L2 = torch.autograd.grad(L2, self.model.model.parameters(), create_graph=True)
-
-    #         grad_L1_norm = sum(torch.norm(g) for g in grad_L1 if g is not None)
-    #         grad_L2_norm = sum(torch.norm(g) for g in grad_L2 if g is not None)
-
-    #         hvp_L2_L1 = torch.autograd.grad(grad_L1, self.model.model.parameters(), grad_outputs=grad_L2, retain_graph=True)
-    #         hvp_L1_L2 = torch.autograd.grad(grad_L2, self.model.model.parameters(), grad_outputs=grad_L1, retain_graph=True)
-
-    #         lie_bracket = [hvp_21 - hvp_12 for hvp_21, hvp_12 in zip(hvp_L2_L1, hvp_L1_L2)]
-
-    #         self.model.zero_grad()
-
-    #         L_total = self.lamb * L1 + L2 + (self.h / 4) * grad_L1_norm + (self.h / 4) * grad_L2_norm
-    #         return L_total, L1, L2, grad_L1_norm, grad_L2_norm, lie_bracket
-
-    #     return torch.nn.functional.cross_entropy(outputs_new[t], targets_new - self.model.task_offset[t])
 
     def criterion(self, t, outputs_new, targets_new, outputs_old=None, targets_old=None, is_eval=True):
         """Returns the loss value"""
@@ -236,15 +212,78 @@ class Appr(Inc_Learning_Appr):
             grad_L1 = torch.autograd.grad(L1, self.model.model.parameters(), create_graph=True)
             grad_L2 = torch.autograd.grad(L2, self.model.model.parameters(), create_graph=True)
 
+            grad_L1_norm = sum(torch.norm(g) for g in grad_L1 if g is not None)
+            grad_L2_norm = sum(torch.norm(g) for g in grad_L2 if g is not None)
+
             hvp_L2_L1 = torch.autograd.grad(grad_L1, self.model.model.parameters(), grad_outputs=grad_L2, retain_graph=True)
             hvp_L1_L2 = torch.autograd.grad(grad_L2, self.model.model.parameters(), grad_outputs=grad_L1, retain_graph=True)
 
-            lie_bracket_norm = sum(
-                torch.norm(hvp_21 - hvp_12) for hvp_21, hvp_12 in zip(hvp_L2_L1, hvp_L1_L2)
-            )
+            lie_bracket = [hvp_21 - hvp_12 for hvp_21, hvp_12 in zip(hvp_L2_L1, hvp_L1_L2)]
+
             self.model.zero_grad()
 
-            L_total = self.lamb * L1 + L2 + 1e-3 * lie_bracket_norm
-            return L_total, L1, L2, lie_bracket_norm
+            L_total = self.lamb * L1 + L2 + (self.h1 / 4) * grad_L1_norm + (self.h2 / 4) * grad_L2_norm
+            return L_total, L1, L2, grad_L1_norm, grad_L2_norm, lie_bracket
 
         return torch.nn.functional.cross_entropy(outputs_new[t], targets_new - self.model.task_offset[t])
+
+    # def criterion(self, t, outputs_new, targets_new, outputs_old=None, targets_old=None, is_eval=True):
+    #     """Returns the loss value"""
+
+    #     if is_eval is True:
+    #         return torch.nn.functional.cross_entropy(torch.cat(outputs_new, dim=1), targets_new)
+
+    #     elif self.all_out or len(self.exemplars_dataset) > 0:
+    #         L1 = torch.nn.functional.cross_entropy(torch.cat(outputs_old[:-1], dim=1), targets_old)
+    #         L2 = torch.nn.functional.cross_entropy(outputs_new[t], targets_new - self.model.task_offset[t])
+
+    #         self.model.zero_grad()
+
+    #         grad_L1 = torch.autograd.grad(L1, self.model.model.parameters(), create_graph=True)
+    #         grad_L2 = torch.autograd.grad(L2, self.model.model.parameters(), create_graph=True)
+
+    #         hvp_L2_L1 = torch.autograd.grad(grad_L1, self.model.model.parameters(), grad_outputs=grad_L2, retain_graph=True)
+    #         hvp_L1_L2 = torch.autograd.grad(grad_L2, self.model.model.parameters(), grad_outputs=grad_L1, retain_graph=True)
+
+    #         lie_bracket_norm = sum(
+    #             torch.norm(hvp_21 - hvp_12) for hvp_21, hvp_12 in zip(hvp_L2_L1, hvp_L1_L2)
+    #         )
+    #         self.model.zero_grad()
+
+    #         L_total = self.lamb * L1 + L2 + 3e-3 * lie_bracket_norm
+    #         return L_total, L1, L2, lie_bracket_norm
+
+    #     return torch.nn.functional.cross_entropy(outputs_new[t], targets_new - self.model.task_offset[t])
+
+    # def criterion(self, t, outputs_new, targets_new, outputs_old=None, targets_old=None, is_eval=True):
+    #     """Returns the loss value"""
+
+    #     if is_eval is True:
+    #         return torch.nn.functional.cross_entropy(torch.cat(outputs_new, dim=1), targets_new)
+
+    #     elif self.all_out or len(self.exemplars_dataset) > 0:
+    #         L1 = torch.nn.functional.cross_entropy(torch.cat(outputs_old[:-1], dim=1), targets_old)
+    #         L2 = torch.nn.functional.cross_entropy(outputs_new[t], targets_new - self.model.task_offset[t])
+    #         all_outputs = [torch.cat([outputs_new[i], outputs_old[i]], dim=0) for i in range(len(outputs_new))]
+    #         all_targets = torch.cat([targets_new, targets_old], dim=0)
+    #         Lf = torch.nn.functional.cross_entropy(torch.cat(all_outputs, dim=1), all_targets)
+
+    #         self.model.zero_grad()
+
+    #         grad_L1 = torch.autograd.grad(L1, self.model.model.parameters(), create_graph=True)
+    #         grad_L2 = torch.autograd.grad(L2, self.model.model.parameters(), create_graph=True)
+
+    #         grad_L1_norm = sum(torch.norm(g) for g in grad_L1 if g is not None)
+    #         grad_L2_norm = sum(torch.norm(g) for g in grad_L2 if g is not None)
+
+    #         hvp_L2_L1 = torch.autograd.grad(grad_L1, self.model.model.parameters(), grad_outputs=grad_L2, retain_graph=True)
+    #         hvp_L1_L2 = torch.autograd.grad(grad_L2, self.model.model.parameters(), grad_outputs=grad_L1, retain_graph=True)
+
+    #         lie_bracket = [hvp_21 - hvp_12 for hvp_21, hvp_12 in zip(hvp_L2_L1, hvp_L1_L2)]
+
+    #         self.model.zero_grad()
+
+    #         L_total = Lf + (self.h1 / 4) * grad_L1_norm + (self.h2 / 4) * grad_L2_norm
+    #         return L_total, L1, L2, grad_L1_norm, grad_L2_norm, lie_bracket
+
+    #     return torch.nn.functional.cross_entropy(outputs_new[t], targets_new - self.model.task_offset[t])
