@@ -5,7 +5,7 @@ from .knn import KNN
 
 class ClassifierFactory:
     @staticmethod
-    def create_classifier(classifier_type, device, model, dataset, best_prototypes=False, multi_softmax=False, k=3):
+    def create_classifier(classifier_type, device, model, dataset, best_prototypes=False, multi_softmax=False, k=7):
         if classifier_type == "linear":
             return LinearClassifier(device, model, dataset, multi_softmax)
         elif classifier_type == "nmc":

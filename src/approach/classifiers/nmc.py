@@ -1,17 +1,7 @@
-import time
-from copy import deepcopy
-from collections import Counter
-import torch
 import numpy as np
-from argparse import ArgumentParser
-import umap
-import pandas as pd
-
+import torch
 from torch.utils.data import DataLoader
-from loggers.exp_logger import ExperimentLogger
-from datasets.exemplars_dataset import ExemplarsDataset
 from datasets.exemplars_selection import override_dataset_transform
-
 
 from .classifier import Classifier
 
@@ -26,8 +16,6 @@ class NMC(Classifier):
         self.exemplar_means = []
         self.previous_datasets = []
         self.best_prototypes = best_prototypes
-
-        ### NIE MOŻE TAK BYĆ DO CHUJA WAFLA ###
 
     def classify(self, task, outputs, features, targets, return_dists=False):
         # expand means to all batch images
@@ -52,65 +40,47 @@ class NMC(Classifier):
             return hits_taw, hits_tag, dists
         return hits_taw, hits_tag
 
+    def _extract_features_and_targets(self, dataloader):
+        extracted_features = []
+        extracted_targets = []
+        with torch.no_grad():
+            self.model.eval()
+            for images, targets in dataloader:
+                feats = self.model(images.to(self.device), return_features=True)[1]
+                # normalize
+                extracted_features.append(feats / feats.norm(dim=1).view(-1, 1))
+                extracted_targets.extend(targets)
+        extracted_features = torch.cat(extracted_features)
+        extracted_targets = np.array(extracted_targets)
+        return extracted_features, extracted_targets
+
     def compute_mean_of_exemplars(self, trn_loader, transform):
-        # change transforms to evaluation for this calculation
         dataset = self.previous_datasets[0] if self.best_prototypes else self.exemplars_dataset
         if self.best_prototypes:
             if len(self.previous_datasets) > 1:
                 for subset in self.previous_datasets[1:-1]:
                     dataset += subset
         with override_dataset_transform(dataset, transform) as _ds:
-            # change dataloader so it can be fixed to go sequentially (shuffle=False), this allows to keep same order
             icarl_loader = DataLoader(_ds, batch_size=trn_loader.batch_size, shuffle=False,
                                       num_workers=trn_loader.num_workers, pin_memory=trn_loader.pin_memory)
-            # extract features from the model for all train samples
-            # Page 2: "All feature vectors are L2-normalized, and the results of any operation on feature vectors,
-            # e.g. averages are also re-normalized, which we do not write explicitly to avoid a cluttered notation."
-            extracted_features = []
-            extracted_targets = []
-            with torch.no_grad():
-                self.model.eval()
-                for images, targets in icarl_loader:
-                    feats = self.model(images.to(self.device), return_features=True)[1]
-                    # normalize
-                    extracted_features.append(feats / feats.norm(dim=1).view(-1, 1))
-                    extracted_targets.extend(targets)
-            extracted_features = torch.cat(extracted_features)
-            extracted_targets = np.array(extracted_targets)
+            extracted_features, extracted_targets = self._extract_features_and_targets(icarl_loader)
             for curr_cls in np.unique(extracted_targets):
-                # get all indices from current class
                 cls_ind = np.where(extracted_targets == curr_cls)[0]
-                # get all extracted features for current class
                 cls_feats = extracted_features[cls_ind]
-                # add the exemplars to the set and normalize
                 cls_feats_mean = cls_feats.mean(0) / cls_feats.mean(0).norm()
                 self.exemplar_means.append(cls_feats_mean)
 
     def compute_means_of_current_classes(self, loader, transform):
-        extracted_features = []
-        extracted_targets = []
-        with torch.no_grad():
-            self.model.eval()
-            with override_dataset_transform(loader.dataset, transform) as _ds:
-                # change dataloader so it can be fixed to go sequentially (shuffle=False), this allows to keep same order
-                icarl_loader = DataLoader(_ds, batch_size=loader.batch_size, shuffle=False,
-                                        num_workers=loader.num_workers, pin_memory=loader.pin_memory)
-                for images, targets in icarl_loader:
-                    feats = self.model(images.to(self.device), return_features=True)[1]
-                    # normalize
-                    extracted_features.append(feats / feats.norm(dim=1).view(-1, 1))
-                    extracted_targets.extend(targets)
-        extracted_features = torch.cat(extracted_features)
-        extracted_targets = np.array(extracted_targets)
-        for curr_cls in np.unique(extracted_targets):
-            if curr_cls >= self.model.task_offset[-1]:
-                # get all indices from current class
-                cls_ind = np.where(extracted_targets == curr_cls)[0]
-                # get all extracted features for current class
-                cls_feats = extracted_features[cls_ind]
-                # add the exemplars to the set and normalize
-                cls_feats_mean = cls_feats.mean(0) / cls_feats.mean(0).norm()
-                self.exemplar_means.append(cls_feats_mean)
+        with override_dataset_transform(loader.dataset, transform) as _ds:
+            icarl_loader = DataLoader(_ds, batch_size=loader.batch_size, shuffle=False,
+                                    num_workers=loader.num_workers, pin_memory=loader.pin_memory)
+            extracted_features, extracted_targets = self._extract_features_and_targets(icarl_loader)
+            for curr_cls in np.unique(extracted_targets):
+                if curr_cls >= self.model.task_offset[-1]:
+                    cls_ind = np.where(extracted_targets == curr_cls)[0]
+                    cls_feats = extracted_features[cls_ind]
+                    cls_feats_mean = cls_feats.mean(0) / cls_feats.mean(0).norm()
+                    self.exemplar_means.append(cls_feats_mean)
 
     def prototypes_update(self, t, trn_loader, transform):
         if self.exemplars_dataset._is_active():
