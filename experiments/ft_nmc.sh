@@ -39,10 +39,10 @@ if [ ${update_prototypes} -gt 0 ]; then
     --cm \
     --scheduler-milestones \
     --stop-at-task ${stop_at_task} \
-    --approach ft_nmc \
+    --approach finetuning \
     --num-exemplars ${exemplars} \
     --head-init-mode ${head_init} \
-    --update_prototypes
+    --classifier linear
 else
     exp_name="t${num_tasks}s${nc_first_task}_hz_m:${exemplars}_up:${update_prototypes}"
     result_path="results/${tag}/ft_nmc_hz_${seed}"
