@@ -107,10 +107,10 @@ def main(argv=None):
                         help='Number of epochs per training session (default=%(default)s)')
     parser.add_argument('--lr', default=0.1, type=float, required=False,
                         help='Starting learning rate (default=%(default)s)')
-    parser.add_argument('--scheduler-milestones', default=False, action='store_true', required=False,
+    parser.add_argument('--scheduler-type', default="linear", type=str, required=False, choices=["linear", "cosine"],
                         help='If True, then LinearLR scheduler will be used, '
                              'if set to False scheduler will not be used (default=%(default)s)')  # default=[60, 120, 160]
-    parser.add_argument('--lr-min', default=1e-4, type=float, required=False,
+    parser.add_argument('--lr-min', default=1e-6, type=float, required=False,
                         help='Minimum learning rate (default=%(default)s)')
     parser.add_argument('--lr-factor', default=3, type=float, required=False,
                         help='Learning rate decreasing factor (default=%(default)s)')
@@ -165,7 +165,7 @@ def main(argv=None):
                        wu_lr=args.wu_lr, wu_fix_bn=args.wu_fix_bn, wu_scheduler=args.wu_scheduler,
                        wu_patience=args.wu_patience, wu_wd=args.wu_wd, fix_bn=args.fix_bn,
                        eval_on_train=args.eval_on_train, select_best_model_by_val_loss=True,
-                       scheduler_milestones=args.scheduler_milestones, slca=args.slca)
+                       scheduler_type=args.scheduler_type, slca=args.slca)
 
     if args.no_cudnn_deterministic:
         print('WARNING: CUDNN Deterministic will be disabled.')
