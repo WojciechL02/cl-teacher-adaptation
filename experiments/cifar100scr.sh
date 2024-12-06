@@ -11,21 +11,20 @@
 
 num_tasks=10
 nc_first_task=10
-stop_at_task=5  # default = 0
+stop_at_task=0  # default = 0
 dataset=cifar100_icarl
 network=resnet18
-tag=debug  # experiment name
+tag=scr_params_check  # experiment name
 
 num_epochs=200
-lr=0.1
+lr=0.01
 head_init=zeros
-
-# without warm-up:
 exemplars=2000
-temperature=0.07
+temperature=0.1
+batch_size=256
 
 # for seed in 0 1 2; do
-./experiments/supcon.sh 1 0 ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${lr} ${head_init} ${stop_at_task} 1 ${exemplars} ${temperature} 128
+./experiments/scr.sh 0 0 ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${lr} ${head_init} ${stop_at_task} ${exemplars} ${temperature} ${batch_size}
 # done
 # wait
 
