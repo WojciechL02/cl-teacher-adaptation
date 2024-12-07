@@ -17,11 +17,11 @@ class Appr(Inc_Learning_Appr):
     def __init__(self, model, device, classifier="nmc", nepochs=60, lr=0.5, lr_min=1e-4, lr_factor=3, lr_patience=5, clipgrad=10000,
                  momentum=0.9, wd=1e-5, multi_softmax=False, wu_nepochs=0, wu_lr=0, wu_wd=0, wu_fix_bn=False,
                  fix_bn=False, wu_scheduler='constant', wu_patience=None, eval_on_train=False, select_best_model_by_val_loss=True,
-                 logger=None, exemplars_dataset=None, scheduler_milestones=None, temperature=0.1, slca=False, replay_batch_size=100):
+                 logger=None, exemplars_dataset=None, scheduler_type=None, temperature=0.1, slca=False, replay_batch_size=100):
         super(Appr, self).__init__(model, device, classifier, nepochs, lr, lr_min, lr_factor, lr_patience, clipgrad, momentum, wd,
                                    multi_softmax, wu_nepochs, wu_lr, wu_fix_bn, wu_scheduler, wu_patience, wu_wd,
                                    fix_bn, eval_on_train, select_best_model_by_val_loss, logger, exemplars_dataset,
-                                   scheduler_milestones, slca=slca)
+                                   scheduler_type, slca=slca)
         if classifier != "nmc":
             raise ValueError("Only NMC is supported in Contrastive Learning approaches.")
 

@@ -34,7 +34,7 @@ python3 src/main_incremental.py \
     --log disk wandb \
     --results-path ${result_path} \
     --tags ${tag} \
-    --scheduler-milestones \
+    --scheduler-type linear \
     --stop-at-task ${stop_at_task} \
     --approach scr \
     --temperature ${temperature} \
