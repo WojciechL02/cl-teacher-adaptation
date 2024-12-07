@@ -26,7 +26,9 @@ lamb=0.25
 h=0.1
 
 
-./ft_lb.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} ${lamb} 0 0 0.0 ${lr} ${head_init} ${stop_at_task} linear ${h} &
+./ft_lb.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} 0.5 ${lr} ${head_init} ${stop_at_task} linear ${h} baseline &
+./ft_lb.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} 0.1 ${lr} ${head_init} ${stop_at_task} linear ${h} baseline &
+./ft_lb.sh 0 ${seed} ${tag} ${dataset} ${num_tasks} ${nc_first_task} ${network} ${num_epochs} 0.3 ${lr} ${head_init} ${stop_at_task} linear ${h} baseline &
 # done
 wait
 

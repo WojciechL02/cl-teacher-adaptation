@@ -11,16 +11,14 @@ nc_first_task=$6
 network=$7
 num_epochs=$8
 lamb=$9
-wu_epochs=${10:-0}
-wu_lr=${11:-0.1}
-wu_wd=${12:-0}
 lr=${13:-0.1}
 head_init=${14}
 stop_at_task=${15:-0}
 classifier=${16}
 h=${17}
+name=${18}
 
-exp_name="t${num_tasks}s20_hz_m:${exemplars}"
+exp_name="t${num_tasks}s20_hz_m:${exemplars}_${name}"
 result_path="results/${tag}/ft_lb_hz_${seed}"
 python3 src/main_incremental.py \
     --exp-name ${exp_name} \
