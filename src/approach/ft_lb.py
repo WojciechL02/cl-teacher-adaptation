@@ -39,36 +39,33 @@ class LieBracketOptimizer(Optimizer):
                 grad = param.grad.data
 
                 if i < lie_bracket_len:
-                    lie_bracket_term = lie_bracket[i] * param.data if lie_bracket[i] is not None else 0.0
-                    # param.data = (h / 2) * lie_bracket_term - grad
-                    # print(param.data)
+                    lie_bracket_term = lie_bracket[i] if lie_bracket[i] is not None else 0.0
                 else:
                     lie_bracket_term = 0.0
-                    # param.data -= lr * grad
 
-                grad = grad.add(lie_bracket_term, alpha=-(h / (2 * lr)))
+                grad = grad.add(lie_bracket_term, alpha=-h)
 
                 # Update rule: θ = θ - lr * (∇L_tilde - h/2 * Lie Bracket)
                 param.data -= lr * grad
-                
 
 
 class Appr(Inc_Learning_Appr):
     """Class implementing the finetuning with Lie Bracket"""
 
     def __init__(self, model, device, classifier="linear", nepochs=100, lr=0.05, lr_min=1e-4, lr_factor=3, lr_patience=5, clipgrad=10000,
-                 momentum=0, wd=0, multi_softmax=False, wu_nepochs=0, wu_lr=1e-1, wu_fix_bn=False,
+                 momentum=0, wd=0, lamb=0.25, h=0.1, multi_softmax=False, wu_nepochs=0, wu_lr=1e-1, wu_fix_bn=False,
                  wu_scheduler='constant', wu_patience=None, wu_wd=0., fix_bn=False, eval_on_train=False,
-                 select_best_model_by_val_loss=True, logger=None, exemplars_dataset=None, scheduler_milestones=False,
+                 select_best_model_by_val_loss=True, logger=None, exemplars_dataset=None, scheduler_type=False,
                  all_outputs=False, no_learning=False, slca=False):
         super(Appr, self).__init__(model, device, classifier, nepochs, lr, lr_min, lr_factor, lr_patience, clipgrad, momentum, wd,
                                    multi_softmax, wu_nepochs, wu_lr, wu_fix_bn, wu_scheduler, wu_patience, wu_wd,
                                    fix_bn, eval_on_train, select_best_model_by_val_loss, logger, exemplars_dataset,
-                                   scheduler_milestones, no_learning, slca=slca)
+                                   scheduler_type, no_learning, slca=slca)
         self.all_out = all_outputs
-        self.lamb = 0.3
-        self.h1 = 0.05
-        self.h2 = 0.15
+        self.lamb = lamb
+        self.h = h
+        # self.h1 = 0.05
+        # self.h2 = 0.15
         self.replay_batch_size = 100
 
     @staticmethod
@@ -84,6 +81,8 @@ class Appr(Inc_Learning_Appr):
         parser.add_argument('--no-learning', action='store_true', required=False,
                             help='Do not backpropagate gradients after second task - only do batch norm update '
                                  '(default=%(default)s)')
+        parser.add_argument('--lamb', required=False, type=float, default=0.25)
+        parser.add_argument('--h', required=False, type=float, default=0.1)
         return parser.parse_known_args(args)
 
     def _get_optimizer(self):
@@ -99,8 +98,8 @@ class Appr(Inc_Learning_Appr):
             params = list(self.model.model.parameters()) + list(self.model.heads[-1].parameters())
         else:
             params = self.model.parameters()
-        # return torch.optim.SGD(params, lr=self.lr, weight_decay=self.wd, momentum=self.momentum)
-        return LieBracketOptimizer(params, self.lr, h=0.2)
+        return torch.optim.SGD(params, lr=self.lr, weight_decay=self.wd, momentum=self.momentum)
+        # return LieBracketOptimizer(params, self.lr, h=self.h)
 
     def train_loop(self, t, trn_loader, val_loader):
         """Contains the epochs loop"""
@@ -176,7 +175,7 @@ class Appr(Inc_Learning_Appr):
                 self.logger.log_scalar(task=None, iter=None, name="loss2", value=loss2.item(), group="train")
                 self.logger.log_scalar(task=None, iter=None, name="grad1_norm", value=ngrad1.item(), group="train")
                 self.logger.log_scalar(task=None, iter=None, name="grad2_norm", value=ngrad2.item(), group="train")
-                self.logger.log_scalar(task=None, iter=None, name="lie_bracket_norm", value=lie_bracket_norm.item(), group="train")
+                self.logger.log_scalar(task=t, iter=None, name="lie_bracket_norm", value=lie_bracket_norm.item(), group="train")
             else:
                 loss = self.criterion(t, features_new, targets, features_old, targets_r, is_eval=False)
                 lie_bracket = None
@@ -188,8 +187,8 @@ class Appr(Inc_Learning_Appr):
             loss.backward()
 
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.clipgrad)
-            self.optimizer.step(lie_bracket)
-            # self.optimizer.step()
+            # self.optimizer.step(lie_bracket)
+            self.optimizer.step()
 
         if self.scheduler is not None:
             self.scheduler.step()
@@ -222,7 +221,7 @@ class Appr(Inc_Learning_Appr):
 
             self.model.zero_grad()
 
-            L_total = self.lamb * L1 + L2 + (self.h1 / 4) * grad_L1_norm + (self.h2 / 4) * grad_L2_norm
+            L_total = self.lamb * L1 + L2  # + (self.h1 / 4) * grad_L1_norm + (self.h2 / 4) * grad_L2_norm
             return L_total, L1, L2, grad_L1_norm, grad_L2_norm, lie_bracket
 
         return torch.nn.functional.cross_entropy(outputs_new[t], targets_new - self.model.task_offset[t])

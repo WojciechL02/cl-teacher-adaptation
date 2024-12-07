@@ -14,10 +14,11 @@ nc_first_task=10
 stop_at_task=0  # default = 0
 dataset=cifar100_icarl
 network=resnet18
-tag=scr_params_check  # experiment name
+tag=lie_bracket
+# tag=scr_params_check  # experiment name
 
 num_epochs=200
-lr=0.01
+lr=0.1
 head_init=zeros
 exemplars=2000
 temperature=0.1
