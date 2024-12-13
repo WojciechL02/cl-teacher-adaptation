@@ -17,11 +17,11 @@ class Appr(Inc_Learning_Appr):
     def __init__(self, model, device, classifier="nmc", nepochs=60, lr=0.5, lr_min=1e-4, lr_factor=3, lr_patience=5, clipgrad=10000,
                  momentum=0.9, wd=1e-5, multi_softmax=False, wu_nepochs=0, wu_lr=0, wu_wd=0, wu_fix_bn=False,
                  fix_bn=False, wu_scheduler='constant', wu_patience=None, eval_on_train=False, select_best_model_by_val_loss=True,
-                 logger=None, exemplars_dataset=None, scheduler_milestones=None, temperature=0.1, slca=False, replay_batch_size=100):
+                 logger=None, exemplars_dataset=None, scheduler_type=None, temperature=0.1, slca=False, replay_batch_size=100):
         super(Appr, self).__init__(model, device, classifier, nepochs, lr, lr_min, lr_factor, lr_patience, clipgrad, momentum, wd,
                                    multi_softmax, wu_nepochs, wu_lr, wu_fix_bn, wu_scheduler, wu_patience, wu_wd,
                                    fix_bn, eval_on_train, select_best_model_by_val_loss, logger, exemplars_dataset,
-                                   scheduler_milestones, slca=slca)
+                                   scheduler_type, slca=slca)
         if classifier != "nmc":
             raise ValueError("Only NMC is supported in Contrastive Learning approaches.")
 
@@ -46,23 +46,23 @@ class Appr(Inc_Learning_Appr):
 
     def train_epoch(self, t, trn_loader):
         """Runs a single epoch"""
-        full_loader = torch.utils.data.DataLoader(trn_loader.dataset + self.exemplars_dataset,
-                                                     batch_size=trn_loader.batch_size,
-                                                     shuffle=True,
-                                                     num_workers=trn_loader.num_workers,
-                                                     pin_memory=trn_loader.pin_memory)
+        # full_loader = torch.utils.data.DataLoader(trn_loader.dataset + self.exemplars_dataset,
+        #                                              batch_size=trn_loader.batch_size,
+        #                                              shuffle=True,
+        #                                              num_workers=trn_loader.num_workers,
+        #                                              pin_memory=trn_loader.pin_memory)
 
-        if t > 0:
-            _ds = deepcopy(self.exemplars_dataset)
-            _ds.transform = trn_loader.dataset.transform
-            exemplar_loader = torch.utils.data.DataLoader(_ds,
-                                                     batch_size=self.replay_batch_size,
-                                                     shuffle=True,
-                                                     num_workers=trn_loader.num_workers,
-                                                     pin_memory=trn_loader.pin_memory
-                                                     )
-            # print("LENS: ", f"{len(trn_loader)} vs {len(exemplar_loader)}")
-            trn_loader = zip(trn_loader, exemplar_loader)
+        # if t > 0:
+        #     _ds = deepcopy(self.exemplars_dataset)
+        #     _ds.transform = trn_loader.dataset.transform
+        #     exemplar_loader = torch.utils.data.DataLoader(_ds,
+        #                                              batch_size=self.replay_batch_size,
+        #                                              shuffle=True,
+        #                                              num_workers=trn_loader.num_workers,
+        #                                              pin_memory=trn_loader.pin_memory
+        #                                              )
+        #     # print("LENS: ", f"{len(trn_loader)} vs {len(exemplar_loader)}")
+        #     trn_loader = zip(trn_loader, exemplar_loader)
 
         self.model.train()
         if self.fix_bn and t > 0:
@@ -70,17 +70,17 @@ class Appr(Inc_Learning_Appr):
 
         for samples in trn_loader:
             images, targets = samples
-            if t > 0:
-                (images, target), (images_r, target_r) = samples
-                images_1 = torch.cat([images[0], images_r[0]], dim=0)  # first aug (new + old)
-                images_2 = torch.cat([images[1], images_r[1]], dim=0)  # second aug (new + old)
-                images_1, images_2 = images_1.to(self.device), images_2.to(self.device)
-                images = torch.cat([images_1, images_2])
-                target, target_r = target.to(self.device), target_r.to(self.device)
-                targets = torch.cat([target, target_r])
-            else:
-                images = torch.cat([images[0], images[1]], dim=0)
-                images, targets = images.to(self.device), targets.to(self.device)
+            # if t > 0:
+            #     (images, target), (images_r, target_r) = samples
+            #     images_1 = torch.cat([images[0], images_r[0]], dim=0)  # first aug (new + old)
+            #     images_2 = torch.cat([images[1], images_r[1]], dim=0)  # second aug (new + old)
+            #     images_1, images_2 = images_1.to(self.device), images_2.to(self.device)
+            #     images = torch.cat([images_1, images_2])
+            #     target, target_r = target.to(self.device), target_r.to(self.device)
+            #     targets = torch.cat([target, target_r])
+            # else:
+            images = torch.cat([images[0], images[1]], dim=0)
+            images, targets = images.to(self.device), targets.to(self.device)
 
             bsz = targets.shape[0]
             features = self.model(images)
@@ -100,33 +100,33 @@ class Appr(Inc_Learning_Appr):
             self.scheduler.step()
 
         # compute mean of exemplars on every epoch
-        # self.classifier.prototypes_update(t, trn_loader, self.val_loader_transform)
-        self.classifier.prototypes_update(t, full_loader, self.val_loader_transform)
+        self.classifier.prototypes_update(t, trn_loader, self.val_loader_transform)
+        # self.classifier.prototypes_update(t, full_loader, self.val_loader_transform)
 
     def train_loop(self, t, trn_loader, val_loader):
         """Contains the epochs loop"""
 
         # add exemplars to train_loader
-        # if len(self.exemplars_dataset) > 0 and t > 0:
-        #     trn_loader = torch.utils.data.DataLoader(trn_loader.dataset + self.exemplars_dataset,
-        #                                              batch_size=trn_loader.batch_size,
-        #                                              shuffle=True,
-        #                                              num_workers=trn_loader.num_workers,
-        #                                              pin_memory=trn_loader.pin_memory)
-
-        super().train_loop(t, trn_loader, val_loader)
-
-        exemplar_selection_loader = torch.utils.data.DataLoader(trn_loader.dataset + self.exemplars_dataset,
+        if len(self.exemplars_dataset) > 0 and t > 0:
+            trn_loader = torch.utils.data.DataLoader(trn_loader.dataset + self.exemplars_dataset,
                                                      batch_size=trn_loader.batch_size,
                                                      shuffle=True,
                                                      num_workers=trn_loader.num_workers,
                                                      pin_memory=trn_loader.pin_memory)
 
+        super().train_loop(t, trn_loader, val_loader)
+
+        # exemplar_selection_loader = torch.utils.data.DataLoader(trn_loader.dataset + self.exemplars_dataset,
+        #                                              batch_size=trn_loader.batch_size,
+        #                                              shuffle=True,
+        #                                              num_workers=trn_loader.num_workers,
+        #                                              pin_memory=trn_loader.pin_memory)
+
         # UPDATE PROTOTYPES
-        self.classifier.prototypes_update(t, exemplar_selection_loader, val_loader.dataset.transform)
+        self.classifier.prototypes_update(t, trn_loader, val_loader.dataset.transform)
 
         # EXEMPLAR MANAGEMENT -- select training subset
-        self.exemplars_dataset.collect_exemplars(self.model, exemplar_selection_loader, val_loader.dataset.transform)
+        self.exemplars_dataset.collect_exemplars(self.model, trn_loader, val_loader.dataset.transform)
 
     def eval(self, t, val_loader, log_partial_loss=False):
         """Contains the evaluation code"""
