@@ -18,13 +18,13 @@ class Appr(Inc_Learning_Appr):
     def __init__(self, model, device, classifier="linear", nepochs=100, lr=0.05, lr_min=1e-4, lr_factor=3, lr_patience=5, clipgrad=10000,
                  momentum=0, wd=0, multi_softmax=False, wu_nepochs=0, wu_lr=1e-1, wu_fix_bn=False,
                  wu_scheduler='constant', wu_patience=None, wu_wd=0., fix_bn=False, eval_on_train=False,
-                 select_best_model_by_val_loss=True, logger=None, exemplars_dataset=None, scheduler_milestones=None,
+                 select_best_model_by_val_loss=True, logger=None, exemplars_dataset=None, scheduler_type=None,
                  lamb=1, T=2, replay_batch_size=32,
                  ta=False, slca=False,
                  ):
         super(Appr, self).__init__(model, device, classifier, nepochs, lr, lr_min, lr_factor, lr_patience, clipgrad, momentum, wd,
                                    multi_softmax, wu_nepochs, wu_lr, wu_fix_bn, wu_scheduler, wu_patience, wu_wd, fix_bn,
-                                   eval_on_train, select_best_model_by_val_loss, logger, exemplars_dataset, scheduler_milestones, slca=slca)
+                                   eval_on_train, select_best_model_by_val_loss, logger, exemplars_dataset, scheduler_type, slca=slca)
 
         self.model_old = None
         self.lamb = lamb
@@ -76,8 +76,7 @@ class Appr(Inc_Learning_Appr):
         exemplar_selection_loader = torch.utils.data.DataLoader(trn_loader.dataset + self.exemplars_dataset,
                                                      batch_size=trn_loader.batch_size,
                                                      shuffle=True,
-                                                     num_workers=trn_loader.num_workers,
-                                                     pin_memory=trn_loader.pin_memory)
+                                                     num_workers=trn_loader.num_workers)
         # UPDATE PROTOTYPES
         self.classifier.prototypes_update(t, exemplar_selection_loader, val_loader.dataset.transform)
 
