@@ -107,7 +107,7 @@ def main(argv=None):
                         help='Number of epochs per training session (default=%(default)s)')
     parser.add_argument('--lr', default=0.1, type=float, required=False,
                         help='Starting learning rate (default=%(default)s)')
-    parser.add_argument('--scheduler-type', default="linear", type=str, required=False, choices=["linear", "cosine"],
+    parser.add_argument('--scheduler-type', default="linear", type=str, required=False, choices=["linear", "onecycle", "cosine"],
                         help='If True, then LinearLR scheduler will be used, '
                              'if set to False scheduler will not be used (default=%(default)s)')  # default=[60, 120, 160]
     parser.add_argument('--lr-min', default=1e-6, type=float, required=False,

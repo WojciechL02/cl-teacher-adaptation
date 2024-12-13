@@ -43,7 +43,7 @@ class LieBracketOptimizer(Optimizer):
                 else:
                     lie_bracket_term = 0.0
 
-                grad = grad.add(lie_bracket_term, alpha=-h)
+                grad = grad.add(lie_bracket_term, alpha=-(h / 2))
 
                 # Update rule: θ = θ - lr * (∇L_tilde - h/2 * Lie Bracket)
                 param.data -= lr * grad
@@ -53,20 +53,21 @@ class Appr(Inc_Learning_Appr):
     """Class implementing the finetuning with Lie Bracket"""
 
     def __init__(self, model, device, classifier="linear", nepochs=100, lr=0.05, lr_min=1e-4, lr_factor=3, lr_patience=5, clipgrad=10000,
-                 momentum=0, wd=0, lamb=0.25, h=0.1, multi_softmax=False, wu_nepochs=0, wu_lr=1e-1, wu_fix_bn=False,
+                 momentum=0, wd=0, lamb=0.25, ha=0.1, multi_softmax=False, wu_nepochs=0, wu_lr=1e-1, wu_fix_bn=False,
                  wu_scheduler='constant', wu_patience=None, wu_wd=0., fix_bn=False, eval_on_train=False,
                  select_best_model_by_val_loss=True, logger=None, exemplars_dataset=None, scheduler_type=False,
-                 all_outputs=False, no_learning=False, slca=False):
+                 all_outputs=False, no_learning=False, slca=False, optimizer_type="sgd"):
         super(Appr, self).__init__(model, device, classifier, nepochs, lr, lr_min, lr_factor, lr_patience, clipgrad, momentum, wd,
                                    multi_softmax, wu_nepochs, wu_lr, wu_fix_bn, wu_scheduler, wu_patience, wu_wd,
                                    fix_bn, eval_on_train, select_best_model_by_val_loss, logger, exemplars_dataset,
                                    scheduler_type, no_learning, slca=slca)
         self.all_out = all_outputs
         self.lamb = lamb
-        self.h = h
+        self.h = ha
         # self.h1 = 0.05
         # self.h2 = 0.15
-        self.replay_batch_size = 100
+        self.replay_batch_size = 50
+        self.optimizer_type = optimizer_type
 
     @staticmethod
     def exemplars_dataset_class():
@@ -82,7 +83,8 @@ class Appr(Inc_Learning_Appr):
                             help='Do not backpropagate gradients after second task - only do batch norm update '
                                  '(default=%(default)s)')
         parser.add_argument('--lamb', required=False, type=float, default=0.25)
-        parser.add_argument('--h', required=False, type=float, default=0.1)
+        parser.add_argument('--ha', required=False, type=float, default=0.1)
+        parser.add_argument('--optimizer-type', required=False, type=str, default='sgd')
         return parser.parse_known_args(args)
 
     def _get_optimizer(self):
@@ -98,54 +100,67 @@ class Appr(Inc_Learning_Appr):
             params = list(self.model.model.parameters()) + list(self.model.heads[-1].parameters())
         else:
             params = self.model.parameters()
-        return torch.optim.SGD(params, lr=self.lr, weight_decay=self.wd, momentum=self.momentum)
-        # return LieBracketOptimizer(params, self.lr, h=self.h)
+        if self.optimizer_type == "sgd":
+            return torch.optim.SGD(params, lr=self.lr, weight_decay=self.wd, momentum=self.momentum)
+        else:
+            return LieBracketOptimizer(params, self.lr, h=self.h)
+
+    def _get_scheduler(self):
+        if self.scheduler_type == "linear":
+            # return torch.optim.lr_scheduler.MultiStepLR(optimizer=self.optimizer, milestones=self.scheduler_milestones, gamma=0.1)
+            # return torch.optim.lr_scheduler.LinearLR(optimizer=self.optimizer, start_factor=0.01, end_factor=1.0, total_iters=self.nepochs)
+            return torch.optim.lr_scheduler.LinearLR(optimizer=self.optimizer, start_factor=1.0, end_factor=0.01, total_iters=self.nepochs)
+        elif self.scheduler_type == "onecycle":
+            return torch.optim.lr_scheduler.OneCycleLR(self.optimizer, max_lr=self.lr, total_steps=self.nepochs, final_div_factor=1, cycle_momentum=False)
+        elif self.scheduler_type == "cosine":
+            return torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=self.optimizer, T_max=self.nepochs, eta_min=self.lr*0.01)
+        else:
+            return None
 
     def train_loop(self, t, trn_loader, val_loader):
         """Contains the epochs loop"""
 
         # add exemplars to train_loader
-        # if len(self.exemplars_dataset) > 0 and t > 0:
-        #     trn_loader = torch.utils.data.DataLoader(trn_loader.dataset + self.exemplars_dataset,
-        #                                              batch_size=trn_loader.batch_size,
-        #                                              shuffle=True,
-        #                                              num_workers=trn_loader.num_workers,
-        #                                              pin_memory=trn_loader.pin_memory)
+        if len(self.exemplars_dataset) > 0 and t > 0:
+            trn_loader = torch.utils.data.DataLoader(trn_loader.dataset + self.exemplars_dataset,
+                                                     batch_size=trn_loader.batch_size,
+                                                     shuffle=True,
+                                                     num_workers=trn_loader.num_workers,
+                                                     pin_memory=trn_loader.pin_memory)
 
         # FINETUNING TRAINING -- contains the epochs loop
         super().train_loop(t, trn_loader, val_loader)
 
-        exemplar_selection_loader = torch.utils.data.DataLoader(trn_loader.dataset + self.exemplars_dataset,
-                                                     batch_size=trn_loader.batch_size,
-                                                     shuffle=True,
-                                                     num_workers=trn_loader.num_workers,
-                                                     pin_memory=trn_loader.pin_memory)
+        # exemplar_selection_loader = torch.utils.data.DataLoader(trn_loader.dataset + self.exemplars_dataset,
+        #                                              batch_size=trn_loader.batch_size,
+        #                                              shuffle=True,
+        #                                              num_workers=trn_loader.num_workers)
 
         # UPDATE PROTOTYPES
-        self.classifier.prototypes_update(t, exemplar_selection_loader, val_loader.dataset.transform)
+        # self.classifier.prototypes_update(t, exemplar_selection_loader, val_loader.dataset.transform)
+        self.classifier.prototypes_update(t, trn_loader, val_loader.dataset.transform)
 
         # EXEMPLAR MANAGEMENT -- select training subset
-        self.exemplars_dataset.collect_exemplars(self.model, exemplar_selection_loader, val_loader.dataset.transform)
+        # self.exemplars_dataset.collect_exemplars(self.model, exemplar_selection_loader, val_loader.dataset.transform)
+        self.exemplars_dataset.collect_exemplars(self.model, trn_loader, val_loader.dataset.transform)
 
     def train_epoch(self, t, trn_loader):
         """Runs a single epoch"""
-        full_loader = torch.utils.data.DataLoader(trn_loader.dataset + self.exemplars_dataset,
-                                                     batch_size=trn_loader.batch_size,
-                                                     shuffle=True,
-                                                     num_workers=trn_loader.num_workers,
-                                                     pin_memory=trn_loader.pin_memory)
+        # full_loader = torch.utils.data.DataLoader(trn_loader.dataset + self.exemplars_dataset,
+        #                                              batch_size=trn_loader.batch_size,
+        #                                              shuffle=True,
+        #                                              num_workers=trn_loader.num_workers)
 
-        if t > 0:
-            _ds = deepcopy(self.exemplars_dataset)
-            _ds.transform = trn_loader.dataset.transform
-            exemplar_loader = torch.utils.data.DataLoader(_ds,
-                                                     batch_size=self.replay_batch_size,
-                                                     shuffle=True,
-                                                     num_workers=trn_loader.num_workers,
-                                                     pin_memory=trn_loader.pin_memory
-                                                     )
-            # print("LENS: ", f"{len(trn_loader)} vs {len(exemplar_loader)}")
-            trn_loader = zip(trn_loader, exemplar_loader)
+        # if t > 0:
+        #     _ds = deepcopy(self.exemplars_dataset)
+        #     _ds.transform = trn_loader.dataset.transform
+        #     exemplar_loader = torch.utils.data.DataLoader(_ds,
+        #                                              batch_size=self.replay_batch_size,
+        #                                              shuffle=True,
+        #                                              num_workers=trn_loader.num_workers
+        #                                              )
+        #     # print("LENS: ", f"{len(trn_loader)} vs {len(exemplar_loader)}")
+        #     trn_loader = zip(trn_loader, exemplar_loader)
 
         self.model.train()
         if self.fix_bn and t > 0:
@@ -153,18 +168,32 @@ class Appr(Inc_Learning_Appr):
 
         for samples in trn_loader:
             images, targets = samples
+            # if t > 0:
+            #     (images, target), (images_r, target_r) = samples
+            #     images, images_r = images.to(self.device), images_r.to(self.device)
+            #     targets, targets_r = target.to(self.device), target_r.to(self.device)
+            # else:
+            #     images, targets = images.to(self.device), targets.to(self.device)
+            #     features_old = None
+            #     targets_r = None
+            
+            images, targets = images.to(self.device), targets.to(self.device)
+            features = self.model(images)
             if t > 0:
-                (images, target), (images_r, target_r) = samples
-                images, images_r = images.to(self.device), images_r.to(self.device)
-                targets, targets_r = target.to(self.device), target_r.to(self.device)
+                old_indices = (targets < self.model.task_offset[-1]).nonzero().squeeze()
+                targets_r = targets[old_indices,]
+                features_old = features[old_indices,]
             else:
-                images, targets = images.to(self.device), targets.to(self.device)
-                features_old = None
                 targets_r = None
+                features_old = None
 
-            features_new = self.model(images)
-            if t > 0:
-                features_old = self.model(images_r)
+            new_indices = (targets >= self.model.task_offset[-1]).nonzero().squeeze()
+            targets = targets[new_indices,]
+            features_new = features[new_indices,]
+
+            # features_new = self.model(images)
+            # if t > 0:
+            #     features_old = self.model(images_r)
 
             if t > 0:
                 loss, loss1, loss2, ngrad1, ngrad2, lie_bracket = self.criterion(t, features_new, targets, features_old, targets_r, is_eval=False)
@@ -187,14 +216,18 @@ class Appr(Inc_Learning_Appr):
             loss.backward()
 
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.clipgrad)
-            # self.optimizer.step(lie_bracket)
-            self.optimizer.step()
+            if self.optimizer_type == "sgd":
+                self.optimizer.step()
+            else:
+                self.optimizer.step(lie_bracket)
+            
 
         if self.scheduler is not None:
             self.scheduler.step()
 
         # compute mean of exemplars on every epoch
-        self.classifier.prototypes_update(t, full_loader, self.val_loader_transform)
+        # self.classifier.prototypes_update(t, full_loader, self.val_loader_transform)
+        self.classifier.prototypes_update(t, trn_loader, self.val_loader_transform)
 
     def criterion(self, t, outputs_new, targets_new, outputs_old=None, targets_old=None, is_eval=True):
         """Returns the loss value"""
@@ -214,14 +247,14 @@ class Appr(Inc_Learning_Appr):
             grad_L1_norm = sum(torch.norm(g) for g in grad_L1 if g is not None)
             grad_L2_norm = sum(torch.norm(g) for g in grad_L2 if g is not None)
 
-            hvp_L2_L1 = torch.autograd.grad(grad_L1, self.model.model.parameters(), grad_outputs=grad_L2, retain_graph=True)
-            hvp_L1_L2 = torch.autograd.grad(grad_L2, self.model.model.parameters(), grad_outputs=grad_L1, retain_graph=True)
+            hvp_L2_L1 = torch.autograd.grad(grad_L2, self.model.model.parameters(), grad_outputs=grad_L1, retain_graph=True)
+            hvp_L1_L2 = torch.autograd.grad(grad_L1, self.model.model.parameters(), grad_outputs=grad_L2, retain_graph=True)
 
             lie_bracket = [hvp_21 - hvp_12 for hvp_21, hvp_12 in zip(hvp_L2_L1, hvp_L1_L2)]
 
             self.model.zero_grad()
 
-            L_total = self.lamb * L1 + L2  # + (self.h1 / 4) * grad_L1_norm + (self.h2 / 4) * grad_L2_norm
+            L_total = self.lamb * L1 + L2 + self.lamb * (self.h / 4) * grad_L1_norm + (self.h / 4) * grad_L2_norm
             return L_total, L1, L2, grad_L1_norm, grad_L2_norm, lie_bracket
 
         return torch.nn.functional.cross_entropy(outputs_new[t], targets_new - self.model.task_offset[t])

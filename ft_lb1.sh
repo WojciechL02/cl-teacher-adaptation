@@ -46,4 +46,4 @@ python3 src/main_incremental.py \
     --classifier ${classifier} \
     --lamb ${lamb} \
     --ha ${h} \
-    --optimizer-type sgd
+    --optimizer-type lb
