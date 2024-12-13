@@ -36,9 +36,10 @@ python3 src/main_incremental.py \
     --tags ${tag} \
     --scheduler-type linear \
     --stop-at-task ${stop_at_task} \
-    --approach scr_lb \
+    --approach scr \
     --temperature ${temperature} \
     --num-exemplars ${exemplars} \
     --head-init-mode ${head_init} \
     --classifier nmc \
-    --extra-aug simclr_cifar
+    --extra-aug simclr \
+    --num-workers 15
