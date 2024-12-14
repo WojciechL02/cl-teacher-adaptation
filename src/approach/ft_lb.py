@@ -176,27 +176,28 @@ class Appr(Inc_Learning_Appr):
             #     images, targets = images.to(self.device), targets.to(self.device)
             #     features_old = None
             #     targets_r = None
-            
+
             images, targets = images.to(self.device), targets.to(self.device)
-            features = self.model(images)
+            outputs = self.model(images)
             if t > 0:
                 old_indices = (targets < self.model.task_offset[-1]).nonzero().squeeze()
                 targets_r = targets[old_indices,]
-                features_old = features[old_indices,]
+                outputs_old = [head[old_indices,] for head in outputs]
             else:
                 targets_r = None
-                features_old = None
+                outputs_old = None
 
             new_indices = (targets >= self.model.task_offset[-1]).nonzero().squeeze()
-            targets = targets[new_indices,]
-            features_new = features[new_indices,]
+            targets_new = targets[new_indices,]
+            outputs_new = [head[new_indices,] for head in outputs]
 
             # features_new = self.model(images)
             # if t > 0:
             #     features_old = self.model(images_r)
 
             if t > 0:
-                loss, loss1, loss2, ngrad1, ngrad2, lie_bracket = self.criterion(t, features_new, targets, features_old, targets_r, is_eval=False)
+                loss, loss1, loss2, ngrad1, ngrad2, lie_bracket = self.criterion(t, outputs_new, targets_new, outputs_old, targets_r, is_eval=False)
+                # loss, loss1, loss2, ngrad1, ngrad2, lie_bracket = self.criterion(t, outputs_new, targets_new, outputs, targets, outputs_old, targets_r, is_eval=False)
                 # loss, loss1, loss2, lie_bracket_norm = self.criterion(t, features_new, targets, features_old, targets_r, is_eval=False)
                 # loss, loss1, loss2 = self.criterion(t, features_new, targets, features_old, targets_r, is_eval=False)
                 lie_bracket_norm = sum(torch.norm(lb) for lb in lie_bracket if lb is not None)
@@ -206,7 +207,8 @@ class Appr(Inc_Learning_Appr):
                 self.logger.log_scalar(task=None, iter=None, name="grad2_norm", value=ngrad2.item(), group="train")
                 self.logger.log_scalar(task=t, iter=None, name="lie_bracket_norm", value=lie_bracket_norm.item(), group="train")
             else:
-                loss = self.criterion(t, features_new, targets, features_old, targets_r, is_eval=False)
+                loss = self.criterion(t, outputs_new, targets_new, outputs_old, targets_r, is_eval=False)
+                # loss = self.criterion(t, outputs_new, targets_new, None, None, outputs_old, targets_r, is_eval=False)
                 lie_bracket = None
 
             self.logger.log_scalar(task=None, iter=None, name="loss", value=loss.item(), group="train")
@@ -220,7 +222,6 @@ class Appr(Inc_Learning_Appr):
                 self.optimizer.step()
             else:
                 self.optimizer.step(lie_bracket)
-            
 
         if self.scheduler is not None:
             self.scheduler.step()
@@ -258,6 +259,38 @@ class Appr(Inc_Learning_Appr):
             return L_total, L1, L2, grad_L1_norm, grad_L2_norm, lie_bracket
 
         return torch.nn.functional.cross_entropy(outputs_new[t], targets_new - self.model.task_offset[t])
+
+    # def criterion(self, t, outputs_new, targets_new, all_outputs=None, all_targets=None, outputs_old=None, targets_old=None, is_eval=True):
+    #     """Returns the loss value"""
+
+    #     if is_eval is True:
+    #         return torch.nn.functional.cross_entropy(torch.cat(outputs_new, dim=1), targets_new)
+
+    #     elif self.all_out or len(self.exemplars_dataset) > 0:
+    #         L1 = torch.nn.functional.cross_entropy(torch.cat(outputs_old[:-1], dim=1), targets_old)
+    #         L2 = torch.nn.functional.cross_entropy(outputs_new[t], targets_new - self.model.task_offset[t])
+
+    #         self.model.zero_grad()
+
+    #         grad_L1 = torch.autograd.grad(L1, self.model.model.parameters(), create_graph=True)
+    #         grad_L2 = torch.autograd.grad(L2, self.model.model.parameters(), create_graph=True)
+
+    #         grad_L1_norm = sum(torch.norm(g) for g in grad_L1 if g is not None)
+    #         grad_L2_norm = sum(torch.norm(g) for g in grad_L2 if g is not None)
+
+    #         hvp_L2_L1 = torch.autograd.grad(grad_L2, self.model.model.parameters(), grad_outputs=grad_L1, retain_graph=True)
+    #         hvp_L1_L2 = torch.autograd.grad(grad_L1, self.model.model.parameters(), grad_outputs=grad_L2, retain_graph=True)
+
+    #         lie_bracket = [hvp_21 - hvp_12 for hvp_21, hvp_12 in zip(hvp_L2_L1, hvp_L1_L2)]
+
+    #         self.model.zero_grad()
+
+    #         Lf = torch.nn.functional.cross_entropy(torch.cat(all_outputs, dim=1), all_targets)
+
+    #         L_total = Lf + self.lamb * (self.h / 4) * grad_L1_norm + (self.h / 4) * grad_L2_norm
+    #         return L_total, L1, L2, grad_L1_norm, grad_L2_norm, lie_bracket
+
+    #     return torch.nn.functional.cross_entropy(outputs_new[t], targets_new - self.model.task_offset[t])
 
     # def criterion(self, t, outputs_new, targets_new, outputs_old=None, targets_old=None, is_eval=True):
     #     """Returns the loss value"""
