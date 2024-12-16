@@ -3,6 +3,9 @@ results/
 checkpoints/
 wandb/
 plots/plots
+data/
+results_test/
+.vscode
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
