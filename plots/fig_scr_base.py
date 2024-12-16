@@ -9,6 +9,7 @@ from constants import (
     HUE_ORDER,
     LEGEND_FONTSIZE,
     NAME_FT,
+    NAME_NMC_EX,
     NAME_SCR,
     PLOT_LINEWIDTH,
     TEXT_FONTSIZE,
@@ -51,7 +52,7 @@ def plot_cifar100x10(ax, xlabel, ylabel, legend=False):
     dataset = "cifar100_icarl"
     num_tasks = 10
     nepochs = 100
-    approaches = ["finetuning", "scr"]
+    approaches = ["finetuning", "ft_nmc", "scr"]
 
     # Get all runs for the plots from wandb server"
     api = Api(api_key=wandb_api_key)
@@ -68,6 +69,8 @@ def plot_cifar100x10(ax, xlabel, ylabel, legend=False):
     )
     runs = list(runs)
     print(len(runs))
+    no_names = ["fiery-wave-2103", "cosmic-silence-2082"]
+    runs = [r for r in runs if r.name not in no_names]
     # for r in runs:
     #     if "best_prototypes" in r.config.keys():
     #         if r.config["best_prototypes"] == True:
@@ -84,7 +87,7 @@ def plot_cifar100x10(ax, xlabel, ylabel, legend=False):
     # Set names for the legend
     name_dict = {
         "cifar100_icarl_finetuning_t10s10_hz_m:2000": NAME_FT,
-        # "imagenet_subset_kaggle_ft_nmc_t5s20_hz_m:2000_up:1_full_set_prot": NAME_NMC_FULL,
+        "cifar100_icarl_ft_nmc_t10s10_hz_m:2000_up:1": NAME_NMC_EX,
         "cifar100_icarl_scr_t10s10_hz_m:2000": NAME_SCR,
     }
     # print(df)
@@ -133,7 +136,7 @@ def plot_in10(ax, xlabel, ylabel, legend=False):
     dataset = "imagenet_subset_kaggle"
     num_tasks = 10
     nepochs = 100
-    approaches = ["finetuning", "scr"]
+    approaches = ["finetuning", "ft_nmc", "scr"]
 
     # Get all runs for the plots from wandb server"
     api = Api(api_key=wandb_api_key)
@@ -150,6 +153,8 @@ def plot_in10(ax, xlabel, ylabel, legend=False):
     )
     runs = list(runs)
     print(len(runs))
+    names = ["winter-night-1448", "bright-plasma-1447", "wandering-planet-1446"]
+    runs = [r for r in runs if (r.group != "imagenet_subset_kaggle_ft_nmc_t10s10_hz_m:2000_up:1" or r.name in names)]
     # for r in runs:
     #     if "best_prototypes" in r.config.keys():
     #         if r.config["best_prototypes"] == True:
@@ -166,6 +171,7 @@ def plot_in10(ax, xlabel, ylabel, legend=False):
     # Set names for the legend
     name_dict = {
         "imagenet_subset_kaggle_finetuning_t10s10_hz_m:2000": NAME_FT,
+        "imagenet_subset_kaggle_ft_nmc_t10s10_hz_m:2000_up:1": NAME_NMC_EX,
         # "imagenet_subset_kaggle_ft_nmc_t5s20_hz_m:2000_up:1_full_set_prot": NAME_NMC_FULL,
         "imagenet_subset_kaggle_scr_t10s10_hz_m:2000": NAME_SCR,
     }
@@ -208,11 +214,12 @@ def plot_in10(ax, xlabel, ylabel, legend=False):
     print(labels)
     handles = [
         handles[labels.index(NAME_FT)],
+        handles[labels.index(NAME_NMC_EX)],
         handles[labels.index(NAME_SCR)],
     ]
     plot.legend(
         handles=handles,
-        labels=["Finetuning", "SCR"],
+        labels=["Finetuning", "FT (NMC)", "SCR"],
         loc="upper right",
         fontsize=LEGEND_FONTSIZE,
         title=None,

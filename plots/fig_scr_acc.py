@@ -27,7 +27,7 @@ def parse_run(run, num_tasks):
     run_name = run.group
 
     # download all the values of 'cont_eval_acc_tag/t_0' from the run
-    metric_name = "cont_eval/sg_normal_avg"
+    metric_name = "test/avg_acc_tag"
     cont_eval = run.history(keys=[("%s" % metric_name)], samples=100000)[metric_name]
     max_steps = len(cont_eval)
     steps_per_task = max_steps // num_tasks
@@ -35,7 +35,7 @@ def parse_run(run, num_tasks):
         {
             "run_name": run_name,
             "seed": seed,
-            "task": step+2,
+            "task": step+1,
             "acc": acc,
         }
         for step, acc in enumerate(cont_eval)
@@ -98,7 +98,7 @@ def plot_cifar100(ax, xlabel, ylabel, legend=False):
 
     # Plot configuration
     title = "CIFAR100 | 10 tasks"
-    yticks = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+    yticks = [10, 20, 30, 40, 50, 60, 70, 80, 90]
 
     plot = sns.lineplot(
         data=df,
@@ -114,11 +114,10 @@ def plot_cifar100(ax, xlabel, ylabel, legend=False):
 
     plot.set_title(title)
     plot.set_xlabel(xlabel)
-    plot.set_xticks(range(2, num_tasks+1))
-    plot.set_xlim(2, num_tasks)
+    plot.set_xticks(range(1, num_tasks+1))
+    plot.set_xlim(1, num_tasks)
     plot.set_ylabel(ylabel)
-    # Set lower limit on y axis to 0
-    plot.set_ylim(bottom=0)
+    plot.set_ylim(0, 90)
     plot.set_yticks(yticks)
 
     # Set sizes for text and ticks
@@ -185,7 +184,7 @@ def plot_in100(ax, xlabel, ylabel, legend=False):
 
     # Plot configuration
     title = "ImageNet100 | 10 tasks"
-    yticks = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+    yticks = [10, 20, 30, 40, 50, 60, 70, 80, 90]
 
     plot = sns.lineplot(
         data=df,
@@ -200,9 +199,9 @@ def plot_in100(ax, xlabel, ylabel, legend=False):
 
     plot.set_title(title)
     plot.set_xlabel(xlabel)
-    plot.set_xticks(range(2, num_tasks+1))
-    plot.set_xlim(2, num_tasks)
-    plot.set_ylim(0, 100)
+    plot.set_xticks(range(1, num_tasks+1))
+    plot.set_xlim(1, num_tasks)
+    plot.set_ylim(0, 90)
     plot.set_ylabel(ylabel)
     # Set lower limit on y axis to 0
     plot.set_ylim(bottom=0)
@@ -241,11 +240,11 @@ def main():
 
     os.environ['WANDB_API_KEY'] = '434fcc1957118a52a224c4d4a88db52186983f58'
 
-    plot_cifar100(axes[0], xlabel="Finished Task", ylabel="Stability Gap")
+    plot_cifar100(axes[0], xlabel="Finished Task", ylabel="Average Accuracy")
     plot_in100(axes[1], xlabel="Finished Task", ylabel=None)
 
-    output_path_png = output_dir / "fig_scr_sg.png"
-    output_path_pdf = output_dir / "fig_scr_sg.pdf"
+    output_path_png = output_dir / "fig_scr_acc.png"
+    output_path_pdf = output_dir / "fig_scr_acc.pdf"
     plt.tight_layout()
     plt.savefig(str(output_path_png))
     plt.savefig(str(output_path_pdf))
