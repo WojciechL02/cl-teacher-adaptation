@@ -23,6 +23,7 @@ from last_layer_analysis import last_layer_analysis
 from networks import tvmodels, allmodels, set_tvmodel_head_var
 from datasets.data_loader import get_loaders
 
+
 torch.multiprocessing.set_sharing_strategy('file_system')
 
 
@@ -98,8 +99,6 @@ def main(argv=None):
                         help='Mode of new head weights initialization (default=%(default)s)')
     parser.add_argument('--pretrained', action='store_true',
                         help='Use pretrained backbone (default=%(default)s)')
-    parser.add_argument('--projector-type', default="mlp", type=str, required=False, choices=["mlp", "linear"],
-                        help='Use pretrained backbone (default=%(default)s)')
     # training args
     parser.add_argument('--approach', default='finetuning', type=str, choices=approach.__all__,
                         help='Learning approach used (default=%(default)s)', metavar="APPROACH")
@@ -108,8 +107,8 @@ def main(argv=None):
     parser.add_argument('--lr', default=0.1, type=float, required=False,
                         help='Starting learning rate (default=%(default)s)')
     parser.add_argument('--scheduler-type', default="linear", type=str, required=False, choices=["linear", "onecycle", "cosine"],
-                        help='If True, then LinearLR scheduler will be used, '
-                             'if set to False scheduler will not be used (default=%(default)s)')  # default=[60, 120, 160]
+                        help='LR Scheduler type (default=%(default)s)')
+    # parser.add_argument('--scheduler-params', default="{}", type=str, help='LR Scheduler parameters (specific for scheduler-type) (default=%(default)s)')
     parser.add_argument('--lr-min', default=1e-6, type=float, required=False,
                         help='Minimum learning rate (default=%(default)s)')
     parser.add_argument('--lr-factor', default=3, type=float, required=False,
@@ -146,11 +145,19 @@ def main(argv=None):
     parser.add_argument('--reset-backbone', action='store_true',
                         help='Reset backbone weights between tasks ((default=%(default)s))')
     parser.add_argument('--classifier', default="linear", required=False, choices=['linear', 'nmc', 'knn'],
-                        help='Classification head strategy (default=%(default)s)')
+                        help='Classification head type (default=%(default)s)')
     parser.add_argument('--best_prototypes', action='store_true',
                         help='Calculate prototypes on full trainset (default=%(default)s)')
     parser.add_argument('--slca', action='store_true',
-                        help='Training with SLCA ((default=%(default)s))')
+                        help='Training with Slow Learner technique ((default=%(default)s))')
+    parser.add_argument('--cont-eval', action='store_true',
+                        help='Training with continual evaluation enabled ((default=%(default)s))')
+    parser.add_argument('--umap-latent', action='store_true',
+                        help='Visualize the latent space with UMAP ((default=%(default)s))')
+    parser.add_argument('--log-grad-norm', action='store_true',
+                        help='Log grad norm of the backbone network ((default=%(default)s))')
+    parser.add_argument('--last-head-analysis', action='store_true',
+                        help='Analyse the new head after warmup e.g. log activations statistics ((default=%(default)s))')
 
     # gridsearch args
     parser.add_argument('--gridsearch-tasks', default=0, type=int,
@@ -165,7 +172,8 @@ def main(argv=None):
                        wu_lr=args.wu_lr, wu_fix_bn=args.wu_fix_bn, wu_scheduler=args.wu_scheduler,
                        wu_patience=args.wu_patience, wu_wd=args.wu_wd, fix_bn=args.fix_bn,
                        eval_on_train=args.eval_on_train, select_best_model_by_val_loss=True,
-                       scheduler_type=args.scheduler_type, slca=args.slca)
+                       scheduler_type=args.scheduler_type, slca=args.slca, cont_eval=args.cont_eval,
+                       umap_latent=args.umap_latent, log_grad_norm=args.log_grad_norm, last_head_analysis=args.last_head_analysis)
 
     if args.no_cudnn_deterministic:
         print('WARNING: CUDNN Deterministic will be disabled.')
@@ -293,10 +301,11 @@ def main(argv=None):
         appr_kwargs['exemplars_dataset'] = Appr_ExemplarsDataset(transform, class_indices,
                                                                  **appr_exemplars_dataset_args.__dict__)
     utils.seed_everything(seed=args.seed)
-    appr = Appr(net, device, **appr_kwargs)
+
+    appr = Appr(tst_loader, net, device, **appr_kwargs)
 
     ### Add test loader for oracle evaluation during teacher finetuning
-    appr.tst_loader = tst_loader
+    # appr.tst_loader = tst_loader
 
     # GridSearch
     if args.gridsearch_tasks > 0:
