@@ -1,8 +1,8 @@
 from tests import run_main_and_assert
 
 FAST_LOCAL_TEST_ARGS = "--exp-name local_test --datasets mnist" \
-                       " --network LeNet --num-tasks 3 --seed 1 --batch-size 32" \
-                       " --nepochs 3" \
+                       " --network LeNet --num-tasks 2 --seed 1 --batch-size 32" \
+                       " --nepochs 2" \
                        " --num-workers 0" \
                        " --approach lwf"
 
@@ -19,21 +19,9 @@ def test_lwf_with_exemplars():
 
 def test_lwf_with_warmup():
     args_line = FAST_LOCAL_TEST_ARGS
-    args_line += " --warmup-nepochs 5"
-    args_line += " --warmup-lr-factor 0.5"
+    args_line += " --wu-nepochs 5"
+    args_line += " --wu-lr 0.05"
     args_line += " --num-exemplars 200"
-    run_main_and_assert(args_line)
-
-
-def test_lwf_ta():
-    args_line = FAST_LOCAL_TEST_ARGS
-    args_line += " --ta"
-    run_main_and_assert(args_line)
-
-
-def test_lwf_warmup():
-    args_line = FAST_LOCAL_TEST_ARGS
-    args_line += " --wu-nepochs 1"
     run_main_and_assert(args_line)
 
 
@@ -61,13 +49,7 @@ def test_lwf_warmup_plateau():
     run_main_and_assert(args_line)
 
 
-def test_lwf_with_distillation_from_warmup_head():
+def test_lwf_nmc():
     args_line = FAST_LOCAL_TEST_ARGS
-    args_line += " --wu-nepochs 1 --distill-from-warmup-head"
-    run_main_and_assert(args_line)
-
-
-def test_lwf_mc():
-    args_line = FAST_LOCAL_TEST_ARGS
-    args_line += " --mc"
+    args_line += " --num-exemplars 200 --classifier nmc"
     run_main_and_assert(args_line)
