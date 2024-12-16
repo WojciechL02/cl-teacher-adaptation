@@ -3,6 +3,8 @@ results/
 checkpoints/
 wandb/
 plots/plots
+data/
+results_test/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
