@@ -62,7 +62,7 @@ def main():
     dataset = "cifar100_icarl"
     num_tasks = 10
     nepochs = 100
-    approaches = ["finetuning", "scr"]
+    approaches = ["finetuning", "ft_nmc", "scr"]
 
     # Get all runs for the plots from wandb server"
     api = Api(api_key=wandb_api_key)
@@ -80,7 +80,7 @@ def main():
     runs = list(runs)
     # runs = [r for r in runs if "figure1" in r.tags or "joint" in r.tags]
     runs = [r for r in runs if r.config["num_exemplars"] == 2000]
-    groups = ["cifar100_icarl_finetuning_t10s10_hz_m:2000", "cifar100_icarl_scr_t10s10_hz_m:2000"]
+    groups = ["cifar100_icarl_finetuning_t10s10_hz_m:2000", "cifar100_icarl_ft_nmc_t10s10_hz_m:2000_up:1", "cifar100_icarl_scr_t10s10_hz_m:2000"]
     runs = [r for r in runs if r.group in groups]
     print(len(runs))
 
@@ -95,6 +95,7 @@ def main():
     # Set names for the legend
     name_dict = {
         "cifar100_icarl_finetuning_t10s10_hz_m:2000": NAME_FT,
+        "cifar100_icarl_ft_nmc_t10s10_hz_m:2000_up:1": NAME_NMC_EX,
         "cifar100_icarl_scr_t10s10_hz_m:2000": NAME_SCR,
     }
     df = df[df["run_name"].isin(name_dict.keys())]
@@ -113,7 +114,8 @@ def main():
 
     hue_order = {
         NAME_FT: 1,
-        NAME_SCR: 2,
+        NAME_NMC_EX: 2,
+        NAME_SCR: 3,
     }
 
     # dashes_dict = {
@@ -155,11 +157,12 @@ def main():
     handles, labels = plot.get_legend_handles_labels()
     handles = [
         handles[labels.index(NAME_FT)],
+        handles[labels.index(NAME_NMC_EX)],
         handles[labels.index(NAME_SCR)],
     ]
     plot.legend(
         handles=handles,
-        labels=labels,
+        labels=["Finetuning", "FT (NMC)", "SCR"],
         # loc="upper left",
         fontsize=LEGEND_FONTSIZE,
         title=None,

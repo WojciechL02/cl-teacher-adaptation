@@ -82,6 +82,9 @@ def main():
     runs = [r for r in runs if r.config["num_exemplars"] == 2000]
     groups = ["imagenet_subset_kaggle_finetuning_t10s10_hz_m:2000", "imagenet_subset_kaggle_scr_t10s10_hz_m:2000"]
     runs = [r for r in runs if r.group in groups]
+    for r in runs:
+        if r.group == "imagenet_subset_kaggle_finetuning_t10s10_hz_m:2000" and r.config["classifier"] == "nmc":
+            r.group += "_nmc"
     print(len(runs))
 
     # Parse runs to plotting format
@@ -95,6 +98,7 @@ def main():
     # Set names for the legend
     name_dict = {
         "imagenet_subset_kaggle_finetuning_t10s10_hz_m:2000": NAME_FT,
+        "imagenet_subset_kaggle_finetuning_t10s10_hz_m:2000_nmc": NAME_NMC_EX,
         "imagenet_subset_kaggle_scr_t10s10_hz_m:2000": NAME_SCR,
     }
     df = df[df["run_name"].isin(name_dict.keys())]
@@ -113,7 +117,8 @@ def main():
 
     hue_order = {
         NAME_FT: 1,
-        NAME_SCR: 2,
+        NAME_NMC_EX: 2,
+        NAME_SCR: 3,
     }
 
     # dashes_dict = {
@@ -155,12 +160,13 @@ def main():
     handles, labels = plot.get_legend_handles_labels()
     handles = [
         handles[labels.index(NAME_FT)],
+        handles[labels.index(NAME_NMC_EX)],
         handles[labels.index(NAME_SCR)],
     ]
     plot.legend(
         handles=handles,
-        labels=labels,
-        # loc="upper left",
+        labels=["Finetuning", "FT (NMC)", "SCR"],
+        loc="upper right",
         fontsize=LEGEND_FONTSIZE,
         title=None,
     )
