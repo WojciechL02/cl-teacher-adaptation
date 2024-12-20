@@ -56,11 +56,13 @@ class Appr(Inc_Learning_Appr):
                  momentum=0, wd=0, lamb=0.25, ha=0.1, multi_softmax=False, wu_nepochs=0, wu_lr=1e-1, wu_fix_bn=False,
                  wu_scheduler='constant', wu_patience=None, wu_wd=0., fix_bn=False, eval_on_train=False,
                  select_best_model_by_val_loss=True, logger=None, exemplars_dataset=None, scheduler_type=False,
-                 all_outputs=False, no_learning=False, slca=False, optimizer_type="sgd"):
+                 all_outputs=False, no_learning=False, slca=False, optimizer_type="sgd", cont_eval=False, umap_latent=False,
+                 log_grad_norm=False, last_head_analysis=False):
         super(Appr, self).__init__(model, device, classifier, nepochs, lr, lr_min, lr_factor, lr_patience, clipgrad, momentum, wd,
                                    multi_softmax, wu_nepochs, wu_lr, wu_fix_bn, wu_scheduler, wu_patience, wu_wd,
                                    fix_bn, eval_on_train, select_best_model_by_val_loss, logger, exemplars_dataset,
-                                   scheduler_type, no_learning, slca=slca)
+                                   scheduler_type, no_learning, slca=slca, cont_eval=cont_eval, umap_latent=umap_latent,
+                                   log_grad_norm=log_grad_norm, last_head_analysis=last_head_analysis)
         self.all_out = all_outputs
         self.lamb = lamb
         self.h = ha

@@ -289,7 +289,8 @@ def main(argv=None):
     utils.seed_everything(seed=args.seed)
 
     if args.approach in ["scr", "scr_lb", "mixed"]:
-        net = SSL_Net(init_model, remove_existing_head=not args.keep_existing_head, head_init_mode=args.head_init_mode, projector_type=args.projector_type)
+        net = SSL_Net(init_model, remove_existing_head=not args.keep_existing_head, head_init_mode=args.head_init_mode, projector_type=appr_args.projector_type)
+        appr_args.__dict__.pop("projector_type")
     else:
         net = LLL_Net(init_model, remove_existing_head=not args.keep_existing_head, head_init_mode=args.head_init_mode)
     utils.seed_everything(seed=args.seed)
