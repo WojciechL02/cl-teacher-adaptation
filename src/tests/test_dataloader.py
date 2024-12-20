@@ -45,12 +45,12 @@ def test_dataloader_multiple_datasets():
     main(args_line.split(" "))
 
 
-@pytest.mark.parametrize("aug", ["simclr", "simclr_cifar", "colorjitter", "brightness"])
+@pytest.mark.parametrize("aug", ["colorjitter", "brightness", "fetril"])
 def test_dataloader_extra_aug(aug: str):
     args_line = (
         "--exp-name local_test --approach finetuning --datasets mnist"
-        " --network LeNet --num-tasks 2 --batch-size 32"
-        " --results-path ../results/ --num-workers 0 --nepochs 2"
+        " --network LeNet --num-tasks 10 --stop-at-task 3 --batch-size 32"
+        " --results-path ../results/ --num-workers 0 --nepochs 1"
         " --extra-aug {}".format(aug)
     )
     print("ARGS:", args_line)

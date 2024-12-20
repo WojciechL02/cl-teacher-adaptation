@@ -53,3 +53,15 @@ def test_lwf_nmc():
     args_line = FAST_LOCAL_TEST_ARGS
     args_line += " --num-exemplars 200 --classifier nmc"
     run_main_and_assert(args_line)
+
+
+def test_lwf_knn():
+    args_line = FAST_LOCAL_TEST_ARGS
+    args_line += " --num-exemplars 200 --classifier knn"
+    run_main_and_assert(args_line)
+
+
+def test_lwf_cont_eval():
+    args_line = FAST_LOCAL_TEST_ARGS
+    args_line += " --num-exemplars 200 --cont-eval"
+    run_main_and_assert(args_line)

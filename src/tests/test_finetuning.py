@@ -30,6 +30,22 @@ def test_finetuning_nmc():
     run_main_and_assert(args_line)
 
 
+def test_finetuning_knn():
+    args_line = FAST_LOCAL_TEST_ARGS
+    args_line += " --approach finetuning"
+    args_line += " --num-exemplars 200"
+    args_line += " --classifier knn"
+    run_main_and_assert(args_line)
+
+
+def test_finetuning_cont_eval():
+    args_line = FAST_LOCAL_TEST_ARGS
+    args_line += " --approach finetuning"
+    args_line += " --num-exemplars 200"
+    args_line += " --cont-eval"
+    run_main_and_assert(args_line)
+
+
 @pytest.mark.xfail
 def test_finetuning_with_exemplars_per_class_and_herding():
     args_line = FAST_LOCAL_TEST_ARGS

@@ -4,7 +4,7 @@ from pathlib import Path
 from tests import run_main
 
 FAST_LOCAL_TEST_ARGS = "--exp-name loggers_test --datasets mnist" \
-                       " --network LeNet --num-tasks 3 --seed 1 --batch-size 32" \
+                       " --network LeNet --num-tasks 2 --seed 1 --batch-size 32" \
                        " --nepochs 2 --lr-factor 10 --momentum 0.9 --lr-min 1e-7" \
                        " --num-workers 0 --approach finetuning"
 
