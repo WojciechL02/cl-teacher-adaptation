@@ -19,7 +19,8 @@ class KNN(Classifier):
         self.data_targets = None
 
     def _find_classes_from_dists(self, dists, classes):
-        out = dists.topk(self.k, largest=False, sorted=True)
+        k_ = min(self.k, dists.shape[0])
+        out = dists.topk(k_, largest=False, sorted=True)
         predicted_classes = []
         for i in range(out.indices.shape[0]):
             neighbors_classes = classes[out.indices[i]]
@@ -66,19 +67,21 @@ class KNN(Classifier):
                 self.data_features = torch.cat(extracted_features)
                 self.data_targets = torch.cat(extracted_targets).to(self.device)
 
-                # BALANCE REFERENCE DATASET
-                _, counts = self.data_targets.unique(sorted=True, return_counts=True)
-                min_count = counts[0] * self.model.task_cls[t]
-                current_task_classes = torch.arange(0, self.model.task_cls[t]) + self.model.task_offset[t]
-                indices = torch.nonzero(self.data_targets.unsqueeze(1) == current_task_classes.to(self.device), as_tuple=False)[:, 0]
-                balanced_current_task = indices[torch.randperm(indices.size(0))[:min_count]]
+                self._balance_reference_dataset(t)
 
-                all_indices = torch.arange(self.data_targets.size(0)).to(self.device)
-                old_data_indices = all_indices[~torch.isin(all_indices, indices.to(self.device))]
-                total_balanced_indices = torch.cat([balanced_current_task, old_data_indices])
+    def _balance_reference_dataset(self, t):
+        _, counts = self.data_targets.unique(sorted=True, return_counts=True)
+        min_count = counts[0] * self.model.task_cls[t]
+        current_task_classes = torch.arange(0, self.model.task_cls[t]) + self.model.task_offset[t]
+        indices = torch.nonzero(self.data_targets.unsqueeze(1) == current_task_classes.to(self.device), as_tuple=False)[:, 0]
+        balanced_current_task = indices[torch.randperm(indices.size(0))[:min_count]]
 
-                self.data_targets = self.data_targets[total_balanced_indices.to(self.device)]
-                self.data_features = self.data_features[total_balanced_indices.to(self.device)]
+        all_indices = torch.arange(self.data_targets.size(0)).to(self.device)
+        old_data_indices = all_indices[~torch.isin(all_indices, indices.to(self.device))]
+        total_balanced_indices = torch.cat([balanced_current_task, old_data_indices])
+
+        self.data_targets = self.data_targets[total_balanced_indices.to(self.device)]
+        self.data_features = self.data_features[total_balanced_indices.to(self.device)]
 
     def get_task_ids(self, outputs, stacked_shape):
         preds = self._find_classes_from_dists(outputs, self.data_targets)
