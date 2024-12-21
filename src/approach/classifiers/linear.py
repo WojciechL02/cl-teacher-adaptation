@@ -1,15 +1,4 @@
-import time
-from copy import deepcopy
-from collections import Counter
 import torch
-import numpy as np
-from argparse import ArgumentParser
-import umap
-import pandas as pd
-
-from loggers.exp_logger import ExperimentLogger
-from datasets.exemplars_dataset import ExemplarsDataset
-
 from .classifier import Classifier
 
 
