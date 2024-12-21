@@ -411,7 +411,7 @@ class Inc_Learning_Appr:
         self.model.set_state_dict(best_model)
 
         # MEASURE LAST HEAD DISTANCE/SIMILARITY
-        if self.last_head_analysis and t > 0 and self.wu_nepochs > 0:
+        if self.last_head_analysis and t > 0 and self.warmup_epochs > 0:
             head_after_wu_vect = torch.nn.utils.parameters_to_vector(head_after_wu.parameters()).unsqueeze(0)
             head_curr_vect = torch.nn.utils.parameters_to_vector(self.model.heads[-1].parameters()).unsqueeze(0)
 
