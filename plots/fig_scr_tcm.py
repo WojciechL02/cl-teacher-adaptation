@@ -18,8 +18,8 @@ from constants import (
 root = Path(__file__).parent
 output_dir = root / "plots"
 output_dir.mkdir(exist_ok=True, parents=True)
-output_path_png = output_dir / "fig_scr_tcm2.png"
-output_path_pdf = output_dir / "fig_scr_tcm2.pdf"
+output_path_png = output_dir / "fig_scr_tcm.png"
+output_path_pdf = output_dir / "fig_scr_tcm.pdf"
 
 plt.figure(figsize=(8, 8))
 plt.clf()
@@ -55,6 +55,16 @@ plot.set_ylabel(ylabel, fontsize=18)
 plot.set_title(title, fontsize=18)
 plt.xticks(fontsize=16)
 plt.yticks(fontsize=16)
+
+# fig, axs = plt.subplots(3, 2, figsize=(8, 12))
+# fig.subplots_adjust(wspace=0.5, hspace=0.4)
+# axs = axs.flatten()
+# dir_ = root / "plots"
+# image_paths = [f"{dir_}/fig_scr_tcm1.png", f"{dir_}/fig_scr_tcm2.png", f"{dir_}/fig_scr_tcm3.png", f"{dir_}/fig_scr_tcm4.png",f"{dir_}/fig_scr_tcm5.png",f"{dir_}/fig_scr_tcm6.png"]
+# for i, img_path in enumerate(image_paths):
+#     img = plt.imread(img_path)  # Read the image
+#     axs[i].imshow(img)            # Display the image in the subplot
+#     axs[i].axis("off")            # Hide axes for better visualization
 
 plt.tight_layout()
 plt.savefig(str(output_path_png), bbox_inches='tight', pad_inches=0)
