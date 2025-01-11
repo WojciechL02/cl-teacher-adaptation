@@ -1,18 +1,19 @@
 import torch
+from typing import Tuple
 from .classifier import Classifier
 
 
 class LinearClassifier(Classifier):
     """Basic class for implementing classifiers for incremental learning approaches"""
 
-    def __init__(self, device, model, exemplars_dataset, multi_softmax=False):
+    def __init__(self, device, model, exemplars_dataset, multi_softmax=False) -> None:
         super(LinearClassifier, self).__init__()
         self.device = device
         self.model = model
         self.multi_softmax = multi_softmax
         self.exemplars_dataset = exemplars_dataset
 
-    def classify(self, task, outputs, features, targets, return_dists=False):
+    def classify(self, task: int, outputs: list, features: torch.Tensor, targets: torch.Tensor, return_dists: bool = False) -> Tuple[torch.Tensor, torch.Tensor]:
         pred = torch.zeros_like(targets)
         # Task-Aware Multi-Head
         for m in range(len(pred)):
@@ -30,7 +31,7 @@ class LinearClassifier(Classifier):
             return hits_taw, hits_tag, outputs
         return hits_taw, hits_tag
 
-    def get_task_ids(self, outputs, stacked_shape):
+    def get_task_ids(self, outputs: list, stacked_shape: tuple) -> list:
         outputs = torch.stack(outputs, dim=1)
         outputs = torch.max(outputs, dim=-1)[0]
         return outputs.argmax(dim=-1).tolist()

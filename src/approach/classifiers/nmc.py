@@ -2,6 +2,8 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 from datasets.exemplars_selection import override_dataset_transform
+from typing import Tuple, Callable
+
 
 from .classifier import Classifier
 
@@ -9,7 +11,7 @@ from .classifier import Classifier
 class NMC(Classifier):
     """Class implementing the Nearest-Mean-Classifier (NMC)"""
 
-    def __init__(self, device, model, exemplars_dataset, best_prototypes=False):
+    def __init__(self, device, model, exemplars_dataset, best_prototypes=False) -> None:
         self.device = device
         self.model = model
         self.exemplars_dataset = exemplars_dataset
@@ -17,7 +19,7 @@ class NMC(Classifier):
         self.previous_datasets = []
         self.best_prototypes = best_prototypes
 
-    def classify(self, task, outputs, features, targets, return_dists=False):
+    def classify(self, task: int, outputs: list, features: torch.Tensor, targets: torch.Tensor, return_dists: bool = False) -> Tuple[torch.Tensor, torch.Tensor]:
         # expand means to all batch images
         means = torch.stack(self.exemplar_means)
         means = torch.stack([means] * features.shape[0])
@@ -40,7 +42,17 @@ class NMC(Classifier):
             return hits_taw, hits_tag, dists
         return hits_taw, hits_tag
 
-    def _extract_features_and_targets(self, dataloader):
+    def _extract_features_and_targets(self, dataloader: DataLoader) -> Tuple[torch.Tensor, np.ndarray]:
+        """
+        Extracts features and targets from the given DataLoader.
+
+        Args:
+            dataloader (DataLoader): The DataLoader to extract features and targets from.
+
+        Returns:
+            Tuple[torch.Tensor, np.ndarray]: Extracted features and corresponding targets.
+        """
+
         extracted_features = []
         extracted_targets = []
         with torch.no_grad():
@@ -54,7 +66,15 @@ class NMC(Classifier):
         extracted_targets = np.array(extracted_targets)
         return extracted_features, extracted_targets
 
-    def compute_mean_of_exemplars(self, trn_loader, transform):
+    def compute_mean_of_exemplars(self, trn_loader: DataLoader, transform: Callable) -> None:
+        """
+        Computes the mean feature vector (prototype) of exemplars.
+
+        Args:
+            trn_loader (DataLoader): DataLoader for training data.
+            transform (Callable): Transformation to apply to the dataset.
+        """
+
         dataset = self.previous_datasets[0] if self.best_prototypes else self.exemplars_dataset
         if self.best_prototypes:
             if len(self.previous_datasets) > 1:
@@ -70,7 +90,15 @@ class NMC(Classifier):
                 cls_feats_mean = cls_feats.mean(0) / cls_feats.mean(0).norm()
                 self.exemplar_means.append(cls_feats_mean)
 
-    def compute_means_of_current_classes(self, loader, transform):
+    def compute_means_of_current_classes(self, loader: DataLoader, transform: Callable) -> None:
+        """
+        Computes the mean feature vectors (prototypes) for the current classes.
+
+        Args:
+            loader (DataLoader): DataLoader for current class data.
+            transform (Callable): Transformation to apply to the dataset.
+        """
+
         with override_dataset_transform(loader.dataset, transform) as _ds:
             icarl_loader = DataLoader(_ds, batch_size=loader.batch_size, shuffle=False,
                                     num_workers=loader.num_workers, pin_memory=loader.pin_memory)
@@ -82,14 +110,34 @@ class NMC(Classifier):
                     cls_feats_mean = cls_feats.mean(0) / cls_feats.mean(0).norm()
                     self.exemplar_means.append(cls_feats_mean)
 
-    def prototypes_update(self, t, trn_loader, transform):
+    def prototypes_update(self, t: int, trn_loader: DataLoader, transform: Callable) -> None:
+        """
+        Updates the prototype means for the current and previous tasks.
+
+        Args:
+            t (int): The current task identifier.
+            trn_loader (DataLoader): DataLoader for the training dataset.
+            transform (Callable): Transformation to apply to the dataset.
+        """
+
         if self.exemplars_dataset._is_active():
             self.exemplar_means = []
             if t > 0:
                 self.compute_mean_of_exemplars(trn_loader, transform)
             self.compute_means_of_current_classes(trn_loader, transform)
 
-    def get_task_ids(self, outputs, stacked_shape):
+    def get_task_ids(self, outputs: torch.Tensor, stacked_shape: tuple) -> list:
+        """
+        Assigns task ids based on the model's output.
+
+        Args:
+            outputs (torch.Tensor): Model output tensor.
+            stacked_shape (tuple): Shape of the stacked tensor.
+
+        Returns:
+            list: List of task IDs.
+        """
+
         outputs = outputs.view(stacked_shape[0], stacked_shape[1], stacked_shape[2])
         outputs = torch.min(outputs, dim=-1)[0]
         outputs = outputs.argmin(dim=-1)

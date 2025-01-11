@@ -2,6 +2,7 @@ import torch
 from torch.utils.data import DataLoader
 from collections import Counter
 from datasets.exemplars_selection import override_dataset_transform
+from typing import Tuple, Callable
 
 
 from .classifier import Classifier
@@ -10,7 +11,7 @@ from .classifier import Classifier
 class KNN(Classifier):
     """Class implementing the k-Nearest-Neighbors classifier (kNN)"""
 
-    def __init__(self, device, model, exemplars_dataset, k):
+    def __init__(self, device, model, exemplars_dataset, k: int) -> None:
         self.device = device
         self.model = model
         self.exemplars_dataset = exemplars_dataset
@@ -18,7 +19,18 @@ class KNN(Classifier):
         self.data_features = None
         self.data_targets = None
 
-    def _find_classes_from_dists(self, dists, classes):
+    def _find_classes_from_dists(self, dists: torch.Tensor, classes: torch.Tensor) -> torch.Tensor:
+        """
+        Finds the most common class from the k-nearest neighbors based on distances.
+
+        Args:
+            dists (torch.Tensor): Tensor of distances.
+            classes (torch.Tensor): Tensor of class labels.
+
+        Returns:
+            torch.Tensor: Predicted class labels for each sample.
+        """
+
         k_ = min(self.k, dists.shape[0])
         out = dists.topk(k_, largest=False, sorted=True)
         predicted_classes = []
@@ -29,7 +41,21 @@ class KNN(Classifier):
         preds = torch.tensor(predicted_classes).to(self.device)
         return preds
 
-    def classify(self, task, outputs, features, targets, return_dists=False):
+    def classify(self, task: int, outputs: list, features: torch.Tensor, targets: torch.Tensor, return_dists: bool = False) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Classifies the given features using k-NN.
+
+        Args:
+            task (int): The task identifier.
+            outputs (list): Model outputs.
+            features (torch.Tensor): Input features to classify.
+            targets (torch.Tensor): True labels for classification.
+            return_dists (bool, optional): Whether to return distances. Defaults to False.
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor]: Task-aware and task-agnostic accuracy, and optionally the distances.
+        """
+
         features = features / features.norm(dim=1).view(-1, 1)
         features = features.unsqueeze(1)
         data_features = self.data_features.unsqueeze(0)
@@ -50,7 +76,16 @@ class KNN(Classifier):
             return hits_taw, hits_tag, dists
         return hits_taw, hits_tag
 
-    def prototypes_update(self, t, trn_loader, transform):
+    def prototypes_update(self, t: int, trn_loader: DataLoader, transform: Callable) -> None:
+        """
+        Updates the prototypes with new exemplars.
+
+        Args:
+            t (int): The current task identifier.
+            trn_loader (DataLoader): DataLoader for the training dataset.
+            transform (Callable): The transformation to apply to the dataset.
+        """
+
         if self.exemplars_dataset._is_active():
             with override_dataset_transform(trn_loader.dataset, transform) as _ds:
                 loader = DataLoader(_ds, batch_size=trn_loader.batch_size, shuffle=False,
@@ -69,7 +104,14 @@ class KNN(Classifier):
 
                 self._balance_reference_dataset(t)
 
-    def _balance_reference_dataset(self, t):
+    def _balance_reference_dataset(self, t: int) -> None:
+        """
+        Balances the reference dataset for the current task by undersampling the classes (each task data will be balanced).
+
+        Args:
+            t (int): The current task identifier.
+        """
+
         _, counts = self.data_targets.unique(sorted=True, return_counts=True)
         min_count = counts[0] * self.model.task_cls[t]
         current_task_classes = torch.arange(0, self.model.task_cls[t]) + self.model.task_offset[t]
@@ -83,7 +125,18 @@ class KNN(Classifier):
         self.data_targets = self.data_targets[total_balanced_indices.to(self.device)]
         self.data_features = self.data_features[total_balanced_indices.to(self.device)]
 
-    def get_task_ids(self, outputs, stacked_shape):
+    def get_task_ids(self, outputs: torch.Tensor, stacked_shape: tuple) -> list:
+        """
+        Assigns task ids to the predictions based on the output classes.
+
+        Args:
+            outputs (torch.Tensor): Model outputs.
+            stacked_shape (tuple): Shape of the stacked tensor.
+
+        Returns:
+            list: List of task IDs for each prediction.
+        """
+
         preds = self._find_classes_from_dists(outputs, self.data_targets)
 
         task_ranges = [
