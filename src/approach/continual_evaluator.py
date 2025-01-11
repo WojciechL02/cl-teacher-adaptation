@@ -11,12 +11,12 @@ class ContinualEvaluator:
         self.min_accs_prev = None
         self.last_e_accs = None
 
-    def prepare_evaluator(self, t, nepochs):
+    def prepare_evaluator(self, t: int, nepochs: int) -> None:
         if self._is_active:
             self.nepochs = nepochs
             self.min_accs_prev = torch.ones((t,), requires_grad=False)
 
-    def step(self, task, epoch):
+    def step(self, task: int, epoch: int) -> None:
         if self._is_active:
             if self.min_accs_prev is None:
                 raise RuntimeError("The prepare_evaluator() function must be called at the beggining of task training!")
@@ -24,7 +24,7 @@ class ContinualEvaluator:
             prev_t_accs, current_t_acc, _ = self._compute_accs(task)
             self._compute_metrics(task, epoch, prev_t_accs, current_t_acc)
 
-    def _compute_accs(self, t):
+    def _compute_accs(self, t: int):
         confusion_matrix = torch.zeros((t+1, t+1))
         prev_t_acc = torch.zeros((t,), requires_grad=False)
         current_t_acc = 0.
@@ -77,7 +77,7 @@ class ContinualEvaluator:
         avg_prev_acc = sum_acc / t if t > 0 else 0.
         return prev_t_acc, current_t_acc, avg_prev_acc
 
-    def _compute_metrics(self, t, epoch, prev_t_accs, current_acc):
+    def _compute_metrics(self, t: int, epoch: int, prev_t_accs: torch.Tensor, current_acc: float) -> None:
         # save accs on last epoch of task 0
         if t == 0 and epoch == self.nepochs - 1:
             self.last_e_accs = torch.tensor([current_acc])
@@ -92,19 +92,19 @@ class ContinualEvaluator:
                 # New last acc of prev tasks (current task becomes a prev task)
                 self.last_e_accs = torch.cat((prev_t_accs, torch.tensor([current_acc])))
 
-    def _log_min_acc(self, prev_t_accs):
+    def _log_min_acc(self, prev_t_accs: torch.Tensor) -> float:
         self.min_accs_prev = torch.minimum(self.min_accs_prev, prev_t_accs)
         min_acc = self.min_accs_prev.mean().item()
         self.appr.logger.log_scalar(task=None, iter=None, name="min_acc", value=100 * min_acc, group="cont_eval")
         return min_acc
 
-    def _log_wc_acc(self, t, current_acc, min_acc):
+    def _log_wc_acc(self, t: int, current_acc: float, min_acc: float) -> float:
         k = t + 1
         wc_acc = (1 / k) * current_acc + (1 - (1 / k)) * min_acc
         self.appr.logger.log_scalar(task=None, iter=None, name="wc_acc", value=100 * wc_acc, group="cont_eval")
         return wc_acc
 
-    def _log_sg_and_rec(self, prev_t_accs):
+    def _log_sg_and_rec(self, prev_t_accs: torch.Tensor) -> None:
         # Stability Gap
         sg = self.last_e_accs - self.min_accs_prev
         sg_normalized = torch.div(sg, self.last_e_accs)
