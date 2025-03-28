@@ -4,61 +4,19 @@ from copy import deepcopy
 
 from .incremental_learning import Inc_Learning_Appr
 from datasets.exemplars_dataset import ExemplarsDataset
-from torch.optim import Optimizer
-
-
-class LieBracketOptimizer(Optimizer):
-    def __init__(self, params, lr=1e-3, h=1e-3):
-        """
-        Optimizer which includes the Lie Bracket term in the gradient update.
-
-        Args:
-            params (iterable): Iterable of parameters to optimize or dicts defining parameter groups.
-            lr (float): Learning rate.
-            h (float): Scaling factor for the Lie Bracket regularization term.
-        """
-        defaults = dict(lr=lr, h=h)
-        super(LieBracketOptimizer, self).__init__(params, defaults)
-
-    def step(self, lie_bracket):
-        """
-        Performs a single optimization step.
-
-        Args:
-            lie_bracket (list[Tensor]): Precomputed Lie Bracket [grad L1, grad L2].
-        """
-        lie_bracket_len = len(lie_bracket) if lie_bracket is not None else 0
-        for group in self.param_groups:
-            lr = group['lr']
-            h = group['h']
-
-            for i, param in enumerate(group['params']):
-                if param.grad is None:
-                    continue
-
-                grad = param.grad.data
-
-                if i < lie_bracket_len:
-                    lie_bracket_term = lie_bracket[i] if lie_bracket[i] is not None else 0.0
-                else:
-                    lie_bracket_term = 0.0
-
-                grad = grad.add(lie_bracket_term, alpha=-(h / 2))
-
-                # Update rule: θ = θ - lr * (∇L_tilde - h/2 * Lie Bracket)
-                param.data -= lr * grad
+from .lboptim import LieBracketOptimizer
 
 
 class Appr(Inc_Learning_Appr):
     """Class implementing the finetuning with Lie Bracket"""
 
-    def __init__(self, model, device, classifier="linear", nepochs=100, lr=0.05, lr_min=1e-4, lr_factor=3, lr_patience=5, clipgrad=10000,
+    def __init__(self, tst_loader, model, device, classifier="linear", nepochs=100, lr=0.05, lr_min=1e-4, lr_factor=3, lr_patience=5, clipgrad=10000,
                  momentum=0, wd=0, lamb=0.25, ha=0.1, multi_softmax=False, wu_nepochs=0, wu_lr=1e-1, wu_fix_bn=False,
                  wu_scheduler='constant', wu_patience=None, wu_wd=0., fix_bn=False, eval_on_train=False,
                  select_best_model_by_val_loss=True, logger=None, exemplars_dataset=None, scheduler_type=False,
                  all_outputs=False, no_learning=False, slca=False, optimizer_type="sgd", cont_eval=False, umap_latent=False,
                  log_grad_norm=False, last_head_analysis=False):
-        super(Appr, self).__init__(model, device, classifier, nepochs, lr, lr_min, lr_factor, lr_patience, clipgrad, momentum, wd,
+        super(Appr, self).__init__(tst_loader, model, device, classifier, nepochs, lr, lr_min, lr_factor, lr_patience, clipgrad, momentum, wd,
                                    multi_softmax, wu_nepochs, wu_lr, wu_fix_bn, wu_scheduler, wu_patience, wu_wd,
                                    fix_bn, eval_on_train, select_best_model_by_val_loss, logger, exemplars_dataset,
                                    scheduler_type, no_learning, slca=slca, cont_eval=cont_eval, umap_latent=umap_latent,
@@ -70,6 +28,7 @@ class Appr(Inc_Learning_Appr):
         # self.h2 = 0.15
         self.replay_batch_size = 50
         self.optimizer_type = optimizer_type
+        self.ema_grad_L1 = None
 
     @staticmethod
     def exemplars_dataset_class():
@@ -105,7 +64,8 @@ class Appr(Inc_Learning_Appr):
         if self.optimizer_type == "sgd":
             return torch.optim.SGD(params, lr=self.lr, weight_decay=self.wd, momentum=self.momentum)
         else:
-            return LieBracketOptimizer(params, self.lr, h=self.h)
+            names = [n for n, _ in self.model.named_parameters()]
+            return LieBracketOptimizer(params, names, self.lr, h=self.h)
 
     def _get_scheduler(self):
         if self.scheduler_type == "linear":
@@ -132,6 +92,7 @@ class Appr(Inc_Learning_Appr):
 
         # FINETUNING TRAINING -- contains the epochs loop
         super().train_loop(t, trn_loader, val_loader)
+        # self.ema_grad_L1 = None
 
         # exemplar_selection_loader = torch.utils.data.DataLoader(trn_loader.dataset + self.exemplars_dataset,
         #                                              batch_size=trn_loader.batch_size,
@@ -212,6 +173,10 @@ class Appr(Inc_Learning_Appr):
                 loss = self.criterion(t, outputs_new, targets_new, outputs_old, targets_r, is_eval=False)
                 # loss = self.criterion(t, outputs_new, targets_new, None, None, outputs_old, targets_r, is_eval=False)
                 lie_bracket = None
+                grad_L1 = torch.autograd.grad(loss, self.model.model.parameters(), retain_graph=True)
+                beta = 0.9
+                self.ema_grad_L1 = [g.detach() for g in grad_L1] if self.ema_grad_L1 is None else \
+                    [beta * go + (1 - beta) * gn.detach() for go, gn in zip(self.ema_grad_L1, grad_L1)]
 
             self.logger.log_scalar(task=None, iter=None, name="loss", value=loss.item(), group="train")
 
@@ -245,19 +210,24 @@ class Appr(Inc_Learning_Appr):
             self.model.zero_grad()
 
             grad_L1 = torch.autograd.grad(L1, self.model.model.parameters(), create_graph=True)
+            # if self.ema_grad_L1 is None:
+            #     self.ema_grad_L1 = [torch.zeros_like(g) for g in grad_L1]
+            beta = 0.9
+            self.ema_grad_L1 = [g.detach() for g in grad_L1] if self.ema_grad_L1 is None else \
+                   [beta * go + (1 - beta) * gn.detach() for go, gn in zip(self.ema_grad_L1, grad_L1)]
             grad_L2 = torch.autograd.grad(L2, self.model.model.parameters(), create_graph=True)
 
             grad_L1_norm = sum(torch.norm(g) for g in grad_L1 if g is not None)
             grad_L2_norm = sum(torch.norm(g) for g in grad_L2 if g is not None)
 
-            hvp_L2_L1 = torch.autograd.grad(grad_L2, self.model.model.parameters(), grad_outputs=grad_L1, retain_graph=True)
+            hvp_L2_L1 = torch.autograd.grad(grad_L2, self.model.model.parameters(), grad_outputs=self.ema_grad_L1, retain_graph=True)
             hvp_L1_L2 = torch.autograd.grad(grad_L1, self.model.model.parameters(), grad_outputs=grad_L2, retain_graph=True)
 
             lie_bracket = [hvp_21 - hvp_12 for hvp_21, hvp_12 in zip(hvp_L2_L1, hvp_L1_L2)]
 
             self.model.zero_grad()
 
-            L_total = self.lamb * L1 + L2 + self.lamb * (self.h / 4) * grad_L1_norm + (self.h / 4) * grad_L2_norm
+            L_total = self.lamb * L1 + L2  # + self.lamb * (self.h / 4) * grad_L1_norm + (self.h / 4) * grad_L2_norm
             return L_total, L1, L2, grad_L1_norm, grad_L2_norm, lie_bracket
 
         return torch.nn.functional.cross_entropy(outputs_new[t], targets_new - self.model.task_offset[t])

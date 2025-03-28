@@ -11,20 +11,21 @@
 
 num_tasks=10
 nc_first_task=10
-stop_at_task=3  # default = 0
+stop_at_task=2  # default = 0
 dataset=cifar100_icarl
 network=resnet18
-tag=lie_bracket_3  # experiment name
+tag=expexp  # experiment name
 
-num_epochs=100
+num_epochs=2
 bsz=128
 lr=0.1
 head_init=zeros
 seed=0
 exemplars=2000
+update_prototypes=1
 
-exp_name="t${num_tasks}s20_hz_m:${exemplars}_v2_1_emag1"
-result_path="results/${tag}/ft_lb_hz_${seed}"
+exp_name="t${num_tasks}s20_hz_m:${exemplars}_up:${update_prototypes}"
+result_path="results/${tag}/ft_nmc_hz_${seed}"
 python3 src/main_incremental.py \
     --exp-name ${exp_name} \
     --gpu 0 \
@@ -37,17 +38,12 @@ python3 src/main_incremental.py \
     --nepochs ${num_epochs} \
     --batch-size ${bsz} \
     --seed ${seed} \
-    --log disk wandb \
-    --cont-eval \
+    --log disk \
     --results-path ${result_path} \
     --tags ${tag} \
-    --cm \
-    --scheduler-type linear \
+    --scheduler-milestones \
     --stop-at-task ${stop_at_task} \
-    --approach ft_lb \
+    --approach finetuning \
     --num-exemplars ${exemplars} \
     --head-init-mode ${head_init} \
-    --classifier linear \
-    --lamb 0.15 \
-    --optimizer-type lb \
-    --ha 0.25
+    --classifier nmc

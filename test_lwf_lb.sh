@@ -14,20 +14,20 @@ nc_first_task=10
 stop_at_task=3  # default = 0
 dataset=cifar100_icarl
 network=resnet18
-tag=lie_bracket_3  # experiment name
+tag=lie_bracket_4  # experiment name
 
 num_epochs=100
 bsz=128
 lr=0.1
 head_init=zeros
 seed=0
-exemplars=2000
+classifier=linear
 
-exp_name="t${num_tasks}s20_hz_m:${exemplars}_v2_1_emag1"
-result_path="results/${tag}/ft_lb_hz_${seed}"
+exp_name="t${num_tasks}s20_hz_m:${exemplars}"
+result_path="results/${tag}/lwf_lb_hz_${seed}"
 python3 src/main_incremental.py \
     --exp-name ${exp_name} \
-    --gpu 0 \
+    --gpu 1 \
     --datasets ${dataset} \
     --num-tasks ${num_tasks} \
     --nc-first-task ${nc_first_task} \
@@ -44,10 +44,11 @@ python3 src/main_incremental.py \
     --cm \
     --scheduler-type linear \
     --stop-at-task ${stop_at_task} \
-    --approach ft_lb \
-    --num-exemplars ${exemplars} \
+    --approach lwf_lb \
+    --taskwise-kd \
     --head-init-mode ${head_init} \
     --classifier linear \
-    --lamb 0.15 \
+    --lamb 1 \
     --optimizer-type lb \
-    --ha 0.25
+    --ha 0.1 \
+    --classifier ${classifier}
