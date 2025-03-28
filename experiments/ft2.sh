@@ -38,6 +38,7 @@ if [ ${wu_epochs} -gt 0 ]; then
     --seed ${seed} \
     --log disk wandb \
     --results-path ${result_path} \
+    --cont-eval \
     --tags ${tag} \
     --cm \
     --stop-at-task ${stop_at_task} \
@@ -65,8 +66,9 @@ else
     --nepochs ${num_epochs} \
     --batch-size ${bsz} \
     --seed ${seed} \
-    --log disk wandb \
+    --log disk \
     --results-path ${result_path} \
+    --cont-eval \
     --tags ${tag} \
     --scheduler-type linear \
     --cm \

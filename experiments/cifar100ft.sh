@@ -11,12 +11,12 @@ conda activate FACIL
 
 num_tasks=10
 nc_first_task=10
-stop_at_task=5  # default = 0
-dataset=cifar100_vit
-network=vit_b_16
-tag=transformer  # experiment name
+stop_at_task=3  # default = 0
+dataset=cifar100_icarl
+network=resnet18
+tag=checktest  # experiment name
 
-num_epochs=100
+num_epochs=2
 lr=0.02
 bsz=64
 wu_epochs=50
