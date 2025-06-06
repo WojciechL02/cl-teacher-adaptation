@@ -17,14 +17,14 @@ class Appr(Inc_Learning_Appr):
     # Page 4: "The warm-up step greatly enhances fine-tuning’s old-task performance, but is not so crucial to either our
     #  method or the compared Less Forgetting Learning (see Table 2(b))."
     def __init__(self, tst_loader, model, device, classifier="linear", nepochs=100, lr=0.05, lr_min=1e-4, lr_factor=3, lr_patience=5, clipgrad=10000,
-                 momentum=0, wd=0, ha=0.1, multi_softmax=False, wu_nepochs=0, wu_lr=1e-1, wu_fix_bn=False,
+                 momentum=0, wd=0, multi_softmax=False, wu_nepochs=0, wu_lr=1e-1, wu_fix_bn=False,
                  wu_scheduler='constant', wu_patience=None, wu_wd=0., fix_bn=False, eval_on_train=False,
                  select_best_model_by_val_loss=True, logger=None, exemplars_dataset=None, scheduler_type=False,
                  lamb=1, T=2, mc=False, taskwise_kd=False,
                  ta=False,
                  cka=False, debug_loss=False,
-                 tp=False, ctt=False, bnp=False, cbnt=False, pretraining_epochs=5, ta_lr=1e-5, slca=False, optimizer_type="sgd", cont_eval=False,
-                 umap_latent=False, log_grad_norm=False, last_head_analysis=False
+                 tp=False, ctt=False, bnp=False, cbnt=False, pretraining_epochs=5, ta_lr=1e-5, slca=False, cont_eval=False,
+                 umap_latent=False, log_grad_norm=False, last_head_analysis=False, optimizer_type="sgd", ha=0.1
                  ):
         super(Appr, self).__init__(tst_loader, model, device, classifier, nepochs, lr, lr_min, lr_factor, lr_patience, clipgrad, momentum, wd,
                                    multi_softmax, wu_nepochs, wu_lr, wu_fix_bn, wu_scheduler, wu_patience, wu_wd,
@@ -52,9 +52,9 @@ class Appr(Inc_Learning_Appr):
 
         self.cka = cka
         self.debug_loss = debug_loss
-        self.h = ha
+
         self.optimizer_type = optimizer_type
-        # torch.autograd.set_detect_anomaly(True)
+        self.h = ha
 
     @staticmethod
     def exemplars_dataset_class():
@@ -100,14 +100,14 @@ class Appr(Inc_Learning_Appr):
                                  'the start of the task. (default=%(default)s)')
         parser.add_argument('--debug-loss', default=False, action='store_true', required=False,
                             help='If set, will log intermediate loss values. (default=%(default)s)')
-        parser.add_argument('--ha', required=False, type=float, default=0.1)
-        parser.add_argument('--optimizer-type', required=False, type=str, default='sgd')
+        parser.add_argument('--optimizer-type', default="sgd", type=str, choices=["sgd", "lb"], required=False)
+        parser.add_argument('--ha', default=0.1, required=False, type=float)
 
         return parser.parse_known_args(args)
 
     def _get_optimizer(self):
         """Returns the optimizer"""
-        if self.slca: # and len(self.model.heads) > 1:
+        if self.slca:  # and len(self.model.heads) > 1:
             backbone_params = {'params': self.model.model.parameters(), 'lr': self.lr * 0.1}
             head_params = {'params': self.model.heads.parameters()}
             network_params = [backbone_params, head_params]
@@ -192,11 +192,25 @@ class Appr(Inc_Learning_Appr):
         # Restore best and save model for future tasks
         self.model_old = deepcopy(self.model)
         self.model_old.eval()
-        self.model_old.freeze_all()
+        # self.model_old.freeze_all()
+
+        self.accumulated_grads = [torch.zeros_like(p) for p in self.model_old.model.parameters()]
+        accum_iter = len(trn_loader)
+        for images, targets in trn_loader:
+            images = images.to(self.device, non_blocking=True)
+            targets = targets.to(self.device, non_blocking=True)
+
+            # Forward current model
+            outputs = self.model_old(images)
+            loss = torch.nn.functional.cross_entropy(torch.cat(outputs, dim=1), targets)
+            loss = loss / accum_iter
+
+            batch_grads = torch.autograd.grad(loss, self.model_old.model.parameters(), create_graph=True)
+            for acc_grad, batch_grad in zip(self.accumulated_grads, batch_grads):
+                acc_grad.add_(batch_grad)
 
     def train_epoch(self, t, trn_loader):
         """Runs a single epoch"""
-
         self.model.train()
         if self.fix_bn and t > 0:
             self.model.freeze_bn()
@@ -223,7 +237,24 @@ class Appr(Inc_Learning_Appr):
 
             # Forward current model
             outputs = self.model(images)
+
             loss, loss_kd, loss_ce = self.criterion(t, outputs, targets, targets_old, return_partial_losses=True)
+
+            lie_bracket = None
+            if t > 0:
+                new_grads = torch.autograd.grad(loss_ce, self.model.model.parameters(), create_graph=True)
+
+                hvp1 = self.compute_hvp(self.model_old.model.parameters(), new_grads, grads=self.accumulated_grads)
+                hvp2 = self.compute_hvp(self.model.model.parameters(), self.accumulated_grads, grads=new_grads)
+
+                lie_bracket = [hvp_21 - hvp_12 for hvp_21, hvp_12 in zip(hvp1, hvp2)]
+                lie_bracket_norm = sum(torch.norm(lb) for lb in lie_bracket if lb is not None)
+
+                self.logger.log_scalar(task=t, iter=None, name="lie_bracket_norm", value=lie_bracket_norm.item(), group="train")
+
+                self.model.zero_grad()
+                self.model_old.zero_grad()
+
             if self.debug_loss:
                 self.logger.log_scalar(task=None, iter=None, name='loss_kd', group=f"debug_t{t}",
                                        value=float(loss_kd))
@@ -234,24 +265,10 @@ class Appr(Inc_Learning_Appr):
 
             assert not torch.isnan(loss), "Loss is NaN"
 
-            lie_bracket = None
-            if t > 0:
-                lie_bracket, ngrad1, ngrad2 = self.compute_lie_bracket(loss_kd, loss_ce)
-                outputs = self.model(images)
-                loss, loss_kd, loss_ce = self.criterion(t, outputs, targets, targets_old, return_partial_losses=True)
-
-                lie_bracket_norm = sum(torch.norm(lb) for lb in lie_bracket if lb is not None)
-                self.logger.log_scalar(task=None, iter=None, name="loss1", value=loss_ce.item(), group="train")
-                self.logger.log_scalar(task=None, iter=None, name="loss2", value=loss_kd.item(), group="train")
-                self.logger.log_scalar(task=None, iter=None, name="grad1_norm", value=ngrad1.item(), group="train")
-                self.logger.log_scalar(task=None, iter=None, name="grad2_norm", value=ngrad2.item(), group="train")
-                self.logger.log_scalar(task=t, iter=None, name="lie_bracket_norm", value=lie_bracket_norm.item(), group="train")
-            self.logger.log_scalar(task=None, iter=None, name="loss", value=loss.item(), group="train")
-
             # Backward
-            # self.optimizer.zero_grad()
-            self.model.zero_grad()
+            self.optimizer.zero_grad()
             loss.backward()
+
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.clipgrad)
             if self.optimizer_type == "sgd":
                 self.optimizer.step()
@@ -262,6 +279,10 @@ class Appr(Inc_Learning_Appr):
             self.scheduler.step()
 
         self.classifier.prototypes_update(t, trn_loader, self.val_loader_transform)
+
+    def compute_hvp(self, params, vector, grads):
+        hvp = torch.autograd.grad(grads, params, grad_outputs=vector, retain_graph=True)
+        return hvp
 
     def eval(self, t, val_loader, log_partial_loss=False):
         """Contains the evaluation code"""
@@ -318,38 +339,6 @@ class Appr(Inc_Learning_Appr):
         if size_average:
             ce = ce.mean()
         return ce
-
-    def compute_lie_bracket(self, loss_kd, loss_ce):
-        grad_L1 = torch.autograd.grad(loss_kd, self.model.model.parameters(), create_graph=True)
-        grad_L2 = torch.autograd.grad(loss_ce, self.model.model.parameters(), create_graph=True)
-
-        hvp_L2_L1 = torch.autograd.grad(grad_L2, self.model.model.parameters(), grad_outputs=grad_L1, retain_graph=True)
-        hvp_L1_L2 = torch.autograd.grad(grad_L1, self.model.model.parameters(), grad_outputs=grad_L2)
-
-        lie_bracket = [hvp_21.detach() - hvp_12.detach() for hvp_21, hvp_12 in zip(hvp_L2_L1, hvp_L1_L2)]
-
-        # LIE BRACKET CLIPPING ##########
-        max_norm = 1.0
-        norms = [torch.linalg.vector_norm(g, 2.0) for g in lie_bracket]
-        total_norm = torch.linalg.vector_norm(torch.stack([norm for norm in norms]), 2.0)
-        clip_coef = max_norm / (total_norm + 1e-6)
-        clip_coef_clamped = torch.clamp(clip_coef, max=1.0).to(self.device)
-        for g in lie_bracket:
-            g.mul_(clip_coef_clamped)
-        #################################
-
-        # total_norm = 0
-        # for p in lie_bracket:
-        #     if p is not None:
-        #         param_norm = p.norm(2)
-        #         total_norm += param_norm.item() ** 2
-        # total_norm = total_norm ** 0.5
-        # print("LBN: ", total_norm)
-
-        grad_L1_norm = sum(torch.norm(g.detach()) for g in grad_L1 if g is not None)
-        grad_L2_norm = sum(torch.norm(g.detach()) for g in grad_L2 if g is not None)
-
-        return lie_bracket, grad_L1_norm, grad_L2_norm
 
     def criterion(self, t, outputs, targets, outputs_old=None, return_partial_losses=False):
         """Returns the loss value"""

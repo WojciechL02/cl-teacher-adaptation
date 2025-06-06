@@ -25,7 +25,7 @@ classifier=linear
 exemplars=2000
 
 exp_name="t${num_tasks}s20_hz_m:${exemplars}"
-result_path="results/${tag}/lwf_lb_hz_${seed}"
+result_path="results/${tag}/lwf_hz_${seed}"
 python3 src/main_incremental.py \
     --exp-name ${exp_name} \
     --gpu 0 \
@@ -45,12 +45,10 @@ python3 src/main_incremental.py \
     --log wandb \
     --scheduler-type linear \
     --stop-at-task ${stop_at_task} \
-    --approach lwf_lb \
+    --approach lwf \
     --num-exemplars ${exemplars} \
     --taskwise-kd \
     --head-init-mode ${head_init} \
     --classifier linear \
     --lamb 1 \
-    --optimizer-type lb \
-    --ha 0.15 \
     --classifier ${classifier}
