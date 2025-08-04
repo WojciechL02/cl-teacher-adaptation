@@ -1,18 +1,30 @@
 import torch
 from torch import nn
 from copy import deepcopy
+from networks.projectors import LowRankProjector, FullProjector, DifferentialProjector, MLPProjector, DoubleProjector
 
 
 class LLL_Net(nn.Module):
     """Basic class for implementing networks"""
 
-    def __init__(self, model, remove_existing_head=False, head_init_mode=None):
+    def __init__(
+        self,
+        model,
+        remove_existing_head=False,
+        head_init_mode=None,
+        projector_type=None,
+    ):
         head_var = model.head_var
         assert type(head_var) == str
-        assert not remove_existing_head or hasattr(model, head_var), \
-            "Given model does not have a variable called {}".format(head_var)
-        assert not remove_existing_head or type(getattr(model, head_var)) in [nn.Sequential, nn.Linear], \
-            "Given model's head {} does is not an instance of nn.Sequential or nn.Linear".format(head_var)
+        assert not remove_existing_head or hasattr(
+            model, head_var
+        ), "Given model does not have a variable called {}".format(head_var)
+        assert not remove_existing_head or type(getattr(model, head_var)) in [
+            nn.Sequential,
+            nn.Linear,
+        ], "Given model's head {} does is not an instance of nn.Sequential or nn.Linear".format(
+            head_var
+        )
         super(LLL_Net, self).__init__()
 
         self.model = model
@@ -36,6 +48,23 @@ class LLL_Net(nn.Module):
         self.primary_state_dict = deepcopy(self.model.state_dict())
 
         self.heads = nn.ModuleList()
+
+        self.ln = nn.LayerNorm(self.out_size)
+        self.ln2 = nn.LayerNorm(self.out_size)
+        self.projector_type = projector_type
+        if projector_type is not None:
+            if projector_type == "full":
+                self.projector = FullProjector(dim=self.out_size)
+            elif projector_type == "mlp":
+                self.projector = MLPProjector(dim=self.out_size)
+            elif projector_type == "low_rank":
+                self.projector = LowRankProjector(dim=self.out_size, rank=32)
+            elif projector_type == "differential":
+                self.projector = DifferentialProjector(dim=self.out_size, rank=32)
+            elif projector_type == "double":
+                self.projector = DoubleProjector(dim=self.out_size)
+                self.ln3 = nn.LayerNorm(self.out_size)
+
         self.task_cls = []
         self.task_offset = []
         self._initialize_weights()
@@ -54,11 +83,19 @@ class LLL_Net(nn.Module):
         elif self.head_init_mode is not None:
             self._initialize_head_weights()
 
+        # Projector reinit
+        if self.projector_type is not None:
+            self.projector.reset_weights()
+
         # we re-compute instead of append in case an approach makes changes to the heads
         self.task_cls = torch.tensor([head.out_features for head in self.heads])
-        self.task_offset = torch.cat([torch.LongTensor(1).zero_(), self.task_cls.cumsum(0)[:-1]])
+        self.task_offset = torch.cat(
+            [torch.LongTensor(1).zero_(), self.task_cls.cumsum(0)[:-1]]
+        )
 
-    def forward(self, x, return_features=False):
+    def forward(
+        self, x, return_features=False, is_eval=False, return_proj_output=False
+    ):
         """Applies the forward pass
 
         Simplification to work on multi-head only -- returns all head outputs in a list
@@ -67,13 +104,38 @@ class LLL_Net(nn.Module):
             return_features (bool): return the representations before the heads
         """
         x = self.model(x)
-        assert (len(self.heads) > 0), "Cannot access any head"
+        if self.projector_type is not None and self.projector_type != "double":
+            x = self.ln(x)
+            x_1 = self.projector(x)
+            # x_ = x_1
+            x_ = self.ln2(x_1 + x)
+        elif self.projector_type == "double":
+            x = self.ln(x)
+            x_1, x_2 = self.projector(x)
+            x_proj1 = self.ln2(x_1) + x
+            x_proj2 = self.ln3(x_2) + x
+
+        assert len(self.heads) > 0, "Cannot access any head"
 
         y = []
-        for head in self.heads:
-            y.append(head(x))
+        for head_id, head in enumerate(self.heads):
+            if (not is_eval) and self.projector_type is not None:
+                if self.projector_type == "double":
+                    if head_id < len(self.heads) - 1:
+                        y.append(head(x_proj1))
+                    else:
+                        y.append(head(x_proj2))
+                else:
+                    y.append(head(x_))
+            else:
+                y.append(head(x))
         if return_features:
-            return y, x
+            if self.projector_type is not None and return_proj_output:
+                if self.projector_type == "double":
+                    return y, x, x_1, x_2, x_proj1, x_proj2
+                return y, x, x_1, x_
+            else:
+                return y, x
         else:
             return y
 
@@ -126,15 +188,15 @@ class LLL_Net(nn.Module):
             param.requires_grad = True
 
     def _initialize_head_weights(self):
-        if self.head_init_mode == 'xavier':
+        if self.head_init_mode == "xavier":
             nn.init.xavier_uniform_(self.heads[-1].weight)
             nn.init.zeros_(self.heads[-1].bias)
 
-        elif self.head_init_mode == 'zeros':
+        elif self.head_init_mode == "zeros":
             nn.init.zeros_(self.heads[-1].weight)
             nn.init.zeros_(self.heads[-1].bias)
 
-        elif self.head_init_mode == 'kaiming':
+        elif self.head_init_mode == "kaiming":
             nn.init.kaiming_uniform_(self.heads[-1].weight)
             nn.init.zeros_(self.heads[-1].bias)
 

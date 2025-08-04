@@ -20,16 +20,17 @@ class Appr(Inc_Learning_Appr):
 
     # Sec. 4.1: "we used the method proposed in [29] based on herd selection" and "first one stores a constant number of
     # samples for each old class (e.g. R_per=20) (...) we adopt the first strategy"
-    def __init__(self, model, device, nepochs=160, lr=0.1, lr_min=1e-4, lr_factor=10, lr_patience=8, clipgrad=10000,
-                 momentum=0.9, wd=5e-4, multi_softmax=False, wu_nepochs=0, wu_lr=1e-1, wu_fix_bn=False,
-                 wu_scheduler='constant', wu_patience=None, fix_bn=False, eval_on_train=False,
+    def __init__(self, tst_loader, model, device, classifier="linear", nepochs=160, lr=0.1, lr_min=1e-4, lr_factor=10, lr_patience=8, clipgrad=10000,
+                 momentum=0, wd=0, multi_softmax=False, wu_nepochs=0, wu_lr=1e-1, wu_fix_bn=False,
+                 wu_scheduler='constant', wu_patience=None, wu_wd=0.0, fix_bn=False, eval_on_train=False,
                  select_best_model_by_val_loss=True, logger=None, exemplars_dataset=None,
-                 scheduler_milestones=None, lamb=5., lamb_mr=1., dist=0.5, K=2,
-                 remove_less_forget=False, remove_margin_ranking=False, remove_adapt_lamda=False):
-        super(Appr, self).__init__(model, device, nepochs, lr, lr_min, lr_factor, lr_patience, clipgrad, momentum, wd,
-                                   multi_softmax, wu_nepochs, wu_lr, wu_fix_bn, wu_scheduler, wu_patience,
+                 scheduler_type=None, lamb=5., lamb_mr=1., dist=0.5, K=2,
+                 remove_less_forget=False, remove_margin_ranking=False, remove_adapt_lamda=False, slca=False, cont_eval=False, umap_latent=False,
+                 log_grad_norm=False, last_head_analysis=False, prototype_head_similarity=False,):
+        super(Appr, self).__init__(tst_loader, model, device, classifier, nepochs, lr, lr_min, lr_factor, lr_patience, clipgrad, momentum, wd,
+                                   multi_softmax, wu_nepochs, wu_lr, wu_fix_bn, wu_scheduler, wu_patience, wu_wd,
                                    fix_bn, eval_on_train, select_best_model_by_val_loss, logger, exemplars_dataset,
-                                   scheduler_milestones)
+                                   scheduler_type, slca=slca, cont_eval=cont_eval, umap_latent=umap_latent, log_grad_norm=log_grad_norm, last_head_analysis=last_head_analysis, prototype_head_similarity=prototype_head_similarity)
         self.lamb = lamb
         self.lamb_mr = lamb_mr
         self.dist = dist
@@ -158,7 +159,7 @@ class Appr(Inc_Learning_Appr):
             ref_outputs = None
             ref_features = None
             if t > 0:
-                ref_outputs, ref_features = self.ref_model(images, return_features=True)
+                ref_outputs, ref_features = self.ref_model(images, is_eval=True, return_features=True)
             loss = self.criterion(t, outputs, targets, ref_outputs, features, ref_features)
             # Backward
             self.optimizer.zero_grad()
@@ -166,6 +167,8 @@ class Appr(Inc_Learning_Appr):
             self.optimizer.step()
         if self.scheduler is not None:
             self.scheduler.step()
+
+        self.classifier.prototypes_update(t, trn_loader, self.val_loader_transform)
 
     def criterion(self, t, outputs, targets, ref_outputs=None, features=None, ref_features=None):
         """Returns the loss value"""
@@ -214,7 +217,7 @@ class Appr(Inc_Learning_Appr):
                     # Eq. 8: margin ranking loss
                     loss_mr = nn.MarginRankingLoss(margin=self.dist)(gt_scores.view(-1, 1),
                                                                      max_novel_scores.view(-1, 1),
-                                                                     torch.ones(hard_num * self.K).to(self.device))
+                                                                     torch.ones(hard_num * self.K, 1).to(self.device))
                     loss_mr *= self.lamb_mr
 
             # Eq. 1: regular cross entropy
