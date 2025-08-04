@@ -44,9 +44,11 @@ def cm(appr, dataloaders, n_tasks, device):
             for images, targets in dl:
                 images = images.to(device)
                 targets = targets.to(device)
-                outputs, feats = model(images, return_features=True)
+                outputs, feats = model(images, return_features=True, is_eval=True)
 
-                _, _, outputs = appr.classifier.classify(i, outputs, feats, targets, return_dists=True)
+                _, _, outputs = appr.classifier.classify(
+                    i, outputs, feats, targets, return_dists=True
+                )
                 shape = [images.shape[0], len(model.task_cls), model.task_cls[0]]
                 curr_data_task_ids = appr.classifier.get_task_ids(outputs, shape)
                 task_ids.extend(curr_data_task_ids)

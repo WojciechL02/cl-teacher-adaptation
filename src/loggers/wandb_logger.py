@@ -24,7 +24,7 @@ class Logger(ExperimentLogger):
     ):
         super(Logger, self).__init__(exp_path, exp_name)
 
-        wandb.init(group=exp_name, tags=tags)
+        wandb.init(entity="cmaes-cov-rules", group=exp_name, tags=tags)
         self.metrics = []
 
     def log_scalar(self, task, iter, name, value, group=None, curtime=None):
